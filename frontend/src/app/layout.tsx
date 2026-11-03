@@ -1,20 +1,22 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ScrollToTop";
 
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
+const plusJakarta = localFont({
+  src: "./fonts/plus-jakarta-sans/plus-jakarta-sans-variable.ttf",
+  weight: "200 800",
+  style: "normal",
   variable: "--font-heading",
   display: "swap",
 });
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+const inter = localFont({
+  src: "./fonts/inter/inter-variable.ttf",
+  weight: "100 900",
+  style: "normal",
   variable: "--font-body",
   display: "swap",
 });

@@ -1,0 +1,6 @@
+Bundled variable fonts from the official Google Fonts repository:
+https://github.com/google/fonts/tree/main/ofl/inter
+https://github.com/google/fonts/tree/main/ofl/plusjakartasans
+
+Downloaded 2026-11-03. Each font's SIL Open Font License is included as OFL.txt in its directory.
+These assets are loaded with next/font/local; builds do not fetch Google Fonts.
