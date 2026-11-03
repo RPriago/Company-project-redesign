@@ -1,0 +1,28 @@
+# robots.txt for PT Petronesia Energi Nusantara
+# Allow standard search engines for public indexing
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: Slurp
+User-agent: DuckDuckBot
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+
+# Block aggressive AI training scrapers and commercial content harvesters
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: CCBot
+User-agent: anthropic-ai
+User-agent: Claude-Web
+User-agent: ClaudeBot
+User-agent: Bytespider
+User-agent: PetalBot
+User-agent: Amazonbot
+User-agent: TurnitinBot
+Disallow: /
+
+# Default rules for all other crawlers
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/

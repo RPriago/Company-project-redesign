@@ -1,0 +1,60 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: petronesia-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    environment:
+      - PORT=8080
+      - APP_ENV=${APP_ENV:-development}
+      - DB_TYPE=${DB_TYPE:-sqlite}
+      - SQLITE_FILE=/app/data/petronesia.db
+      - DATABASE_URL=${DATABASE_URL:-}
+      - DB_SSLMODE=${DB_SSLMODE:-require}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
+      - CLOUDINARY_URL=${CLOUDINARY_URL:-}
+      - DB_HOST=${DB_HOST:-}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-}
+      - DB_PASSWORD=${DB_PASSWORD:-}
+      - DB_NAME=${DB_NAME:-}
+      - JWT_SECRET=${JWT_SECRET:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    volumes:
+      - backend_data:/app/data
+    networks:
+      - petronesia-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080/api}
+    container_name: petronesia-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - petronesia-network
+
+volumes:
+  backend_data:
+
+networks:
+  petronesia-network:
+    driver: bridge

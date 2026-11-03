@@ -1,0 +1,22 @@
+.DS_Store
+**/.DS_Store
+.env
+!.env.example
+backend/petronesia-backend
+backend/petronesia.db
+backend/uploads/*
+!backend/uploads/.gitkeep
+frontend/node_modules
+frontend/.next
+frontend/.env*.local
+
+# Local databases, operator artifacts, and credentials (deployment excludes separately).
+**/*.db
+**/*.db-*
+**/*.sqlite*
+**/.env
+**/.env.*
+!**/.env.example
+**/.vercel/
+**/*.tsbuildinfo
+DEPLOYMENT_URLS.local.md

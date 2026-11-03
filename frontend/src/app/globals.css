@@ -1,0 +1,211 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* =========================================================================
+       1. APPLE-STYLE NEUTRALS (ANTI-AI-SLOP PALETTE)
+       ========================================================================= */
+    --canvas-pure: #FFFFFF;
+    --canvas-subtle: #F8FAFC;        /* Apple Light Canvas / Slate 50 */
+    --canvas-muted: #F1F5F9;         /* Slate 100 */
+    --canvas-dark: #0B132B;          /* Pertamina Executive Midnight Navy */
+    --canvas-dark-elevated: #111C3D; /* Elevated Dark Surface */
+
+    /* Typography Ink Hierarchy */
+    --text-primary: #0F172A;         /* Slate 900 - Deep crisp text */
+    --text-secondary: #475569;       /* Slate 600 - High legibility body */
+    --text-muted: #94A3B8;           /* Slate 400 - Subtle metadata */
+    --text-inverted: #FFFFFF;        /* Crisp white text for dark canvas */
+    --text-inverted-muted: #CBD5E1;  /* Slate 300 for dark canvas */
+
+    /* =========================================================================
+       2. PERTAMINA BRAND ACCENTS (RESTRAINED & INTENTIONAL)
+       ========================================================================= */
+    /* Pertamina Corporate Blue (Primary Brand, Trust, Leadership) */
+    --color-pertamina-blue: #006BB8;
+    --color-pertamina-blue-hover: #00508F;
+    --color-pertamina-blue-subtle: rgba(0, 107, 184, 0.08);
+    --color-pertamina-blue-glow: rgba(0, 107, 184, 0.18);
+
+    /* Pertamina Energy Red (Primary Action CTA, Dynamics, Urgent Highlights) */
+    --color-pertamina-red: #ED1A2F;
+    --color-pertamina-red-hover: #C41626;
+    --color-pertamina-red-subtle: rgba(237, 26, 47, 0.08);
+    --color-pertamina-red-glow: rgba(237, 26, 47, 0.22);
+
+    /* Pertamina Sustainability Green (ESG, Renewables, Dekarbonisasi) */
+    --color-pertamina-green: #58A618;
+    --color-pertamina-green-hover: #468812;
+    --color-pertamina-green-subtle: rgba(88, 166, 24, 0.08);
+    --color-pertamina-green-glow: rgba(88, 166, 24, 0.18);
+
+    /* =========================================================================
+       3. BORDERS & HAIRLINES (APPLE REFINED EDGES)
+       ========================================================================= */
+    --border-hairline: rgba(226, 232, 240, 0.85); /* 1px crisp border */
+    --border-strong: #CBD5E1;
+    --border-dark: rgba(255, 255, 255, 0.12);
+    --border-focus: #006BB8;
+
+    /* =========================================================================
+       4. RADIUS SYSTEM (APPLE SQUIRCLE / CONTINUOUS CURVES)
+       ========================================================================= */
+    --radius-xs: 6px;
+    --radius-sm: 10px;
+    --radius-md: 14px;
+    --radius-lg: 18px;
+    --radius-xl: 24px;
+    --radius-2xl: 32px;
+    --radius-pill: 9999px;
+
+    /* =========================================================================
+       5. ELEVATIONS & SHADOWS (SUBTLE, NATURAL LIGHTING)
+       ========================================================================= */
+    --shadow-apple-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+    --shadow-apple-card: 0 4px 20px -4px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+    --shadow-apple-hover: 0 12px 32px -8px rgba(15, 23, 42, 0.10), 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+    --shadow-apple-floating: 0 24px 48px -12px rgba(11, 19, 43, 0.16);
+  }
+
+  body {
+    background-color: var(--canvas-pure);
+    color: var(--text-secondary);
+    font-family: var(--font-body), -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+}
+
+/* =========================================================================
+   6. TYPOGRAPHY UTILITY CLASSES (CLEAN & ELEGANT ENTERPRISE PAIRING)
+   ========================================================================= */
+.font-hero-display {
+  font-family: var(--font-heading), -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  letter-spacing: -0.035em;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.font-heading {
+  font-family: var(--font-heading), -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  letter-spacing: -0.025em;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.font-body {
+  font-family: var(--font-body), -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* Eyebrow / Tagline Standard (No AI-slop dots, clean corporate font coloring) */
+.eyebrow-blue {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-pertamina-blue);
+  display: block;
+}
+
+.eyebrow-red {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-pertamina-red);
+  display: block;
+}
+
+.eyebrow-green {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-pertamina-green);
+  display: block;
+}
+
+/* =========================================================================
+   7. APPLE-STYLE LIQUID GLASS SURFACES
+   ========================================================================= */
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-hairline);
+  box-shadow: var(--shadow-apple-card);
+}
+
+.glass-panel-dark {
+  background: rgba(11, 19, 43, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-dark);
+  box-shadow: 0 20px 48px -12px rgba(0, 0, 0, 0.4);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+/* Standard Floating Shadow utility */
+.shadow-floating {
+  box-shadow: var(--shadow-apple-floating);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--color-pertamina-blue);
+  color: #FFFFFF;
+}
+
+/* =========================================================================
+   8. MODERN CLEAN SCROLLBAR (SLENDER, UNOBTRUSIVE APPLE STYLE)
+   ========================================================================= */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* =========================================================================
+   9. GPU ACCELERATION & ANTI-FLICKER RENDERING
+   ========================================================================= */
+*, *::before, *::after {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-framer-motion],
+.transform-gpu {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+}
