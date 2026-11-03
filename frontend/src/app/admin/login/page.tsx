@@ -5,7 +5,7 @@ import { getErrorMessage } from "@/lib/api";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import axios from "axios";
+import { adminApi as axios } from "@/lib/api";
 import {
   Lock,
   User,
@@ -15,7 +15,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import Logo from "@/components/Logo";
-import { API_BASE_URL } from "@/lib/api";
+import { ADMIN_API_BASE_URL as API_BASE_URL } from "@/lib/api";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -36,15 +36,7 @@ export default function AdminLoginPage() {
         password,
       });
 
-      if (res.data?.success && res.data?.token) {
-        localStorage.setItem("petronesia_token", res.data.token);
-        localStorage.setItem(
-          "petronesia_admin",
-          JSON.stringify(res.data.admin || { username })
-        );
-        // Set secure session cookie for Next.js middleware verification
-        const isSecure = typeof window !== "undefined" && window.location.protocol === "https:";
-        document.cookie = `petronesia_token=${encodeURIComponent(res.data.token)}; path=/; max-age=86400; SameSite=Lax${isSecure ? "; Secure" : ""}`;
+      if (res.data?.success) {
         router.push("/admin/dashboard");
       } else {
         setError(res.data?.message || "Login gagal. Periksa kredensial Anda.");

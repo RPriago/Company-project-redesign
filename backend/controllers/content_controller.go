@@ -1,8 +1,9 @@
 package controllers
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
+	"gorm.io/gorm"
 	"log"
 	"regexp"
 	"strings"
@@ -25,6 +26,7 @@ type contentCache struct {
 var globalContentCache = &contentCache{}
 
 func invalidateContentCache() {
+	invalidatePublicCache()
 	globalContentCache.Lock()
 	defer globalContentCache.Unlock()
 	globalContentCache.valid = false
@@ -33,18 +35,14 @@ func invalidateContentCache() {
 
 // GetAllContent - Public endpoint returning all site content with ultra-fast sub-millisecond cache
 func GetAllContent(c *fiber.Ctx) error {
+	if len(c.Path()) >= 11 && c.Path()[:11] == "/api/admin/" {
+		return uncachedGetAllContent(c)
+	}
+	return cachedPublic(c, uncachedGetAllContent)
+}
+func uncachedGetAllContent(c *fiber.Ctx) error {
 	c.Set("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
 	c.Set("X-Content-Type-Options", "nosniff")
-
-	// Fast path: serve cached JSON directly
-	globalContentCache.RLock()
-	if globalContentCache.valid && globalContentCache.allJSON != nil {
-		cachedBytes := globalContentCache.allJSON
-		globalContentCache.RUnlock()
-		c.Set("Content-Type", "application/json")
-		return c.Send(cachedBytes)
-	}
-	globalContentCache.RUnlock()
 
 	var contents []models.SiteContent
 	if err := config.DB.Order("section ASC, id ASC").Find(&contents).Error; err != nil {
@@ -69,18 +67,17 @@ func GetAllContent(c *fiber.Ctx) error {
 		"sections": sectionMap,
 	}
 
-	if encoded, err := json.Marshal(respMap); err == nil {
-		globalContentCache.Lock()
-		globalContentCache.allJSON = encoded
-		globalContentCache.valid = true
-		globalContentCache.Unlock()
-	}
-
 	return c.JSON(respMap)
 }
 
 // GetContentBySection - Public endpoint for section-specific content
 func GetContentBySection(c *fiber.Ctx) error {
+	if len(c.Path()) >= 11 && c.Path()[:11] == "/api/admin/" {
+		return uncachedGetContentBySection(c)
+	}
+	return cachedPublic(c, uncachedGetContentBySection)
+}
+func uncachedGetContentBySection(c *fiber.Ctx) error {
 	c.Set("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
 	section := c.Params("section")
 	var contents []models.SiteContent
@@ -111,6 +108,9 @@ func UpdateSingleContent(c *fiber.Ctx) error {
 	var item models.SiteContent
 
 	if err := config.DB.Where("key = ?", key).First(&item).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return databaseFailure(c)
+		}
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"success": false,
 			"message": fmt.Sprintf("Konten dengan kunci '%s' tidak ditemukan", key),
@@ -130,6 +130,9 @@ func UpdateSingleContent(c *fiber.Ctx) error {
 		})
 	}
 
+	if len(req.Value) > 500000 || len(req.Label) > 255 {
+		return c.SendStatus(400)
+	}
 	item.Value = req.Value
 	if strings.TrimSpace(req.Label) != "" {
 		item.Label = strings.TrimSpace(req.Label)
@@ -173,7 +176,24 @@ func BatchUpdateContent(c *fiber.Ctx) error {
 		})
 	}
 
+	if len(req.Items)+len(req.Map) > 200 {
+		return c.SendStatus(400)
+	}
+	validKey := regexp.MustCompile(`^[a-z0-9_]{2,80}$`)
+	for _, item := range req.Items {
+		if !validKey.MatchString(item.Key) || len(item.Value) > 500000 {
+			return c.SendStatus(400)
+		}
+	}
+	for key, value := range req.Map {
+		if !validKey.MatchString(key) || len(value) > 500000 {
+			return c.SendStatus(400)
+		}
+	}
 	tx := config.DB.Begin()
+	if tx.Error != nil {
+		return databaseFailure(c)
+	}
 
 	upsertKey := func(key, val string) error {
 		key = strings.TrimSpace(key)
@@ -183,6 +203,9 @@ func BatchUpdateContent(c *fiber.Ctx) error {
 		var item models.SiteContent
 		err := tx.Where("key = ?", key).First(&item).Error
 		if err != nil {
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
 			// Infer properties if not exists
 			section := "general"
 			if strings.HasPrefix(key, "home_") || strings.HasPrefix(key, "hero_") || strings.HasPrefix(key, "intro_") || strings.HasPrefix(key, "gallery_") || strings.HasPrefix(key, "dark_block_") || strings.HasPrefix(key, "upstream_") || strings.HasPrefix(key, "downstream_") || strings.HasPrefix(key, "renewable_") || strings.HasPrefix(key, "cta_") {
@@ -249,7 +272,9 @@ func BatchUpdateContent(c *fiber.Ctx) error {
 		}
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		return databaseFailure(c)
+	}
 	invalidateContentCache()
 
 	utils.RecordAudit(c, "BATCH_UPDATE", "CONTENT", "multiple", fmt.Sprintf("Memperbarui massal konten website (%d item / map)", len(req.Items)+len(req.Map)))
@@ -323,8 +348,13 @@ func CreateContent(c *fiber.Ctx) error {
 			"success": false,
 			"message": fmt.Sprintf("Konten dengan kunci '%s' sudah terdaftar", req.Key),
 		})
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return databaseFailure(c)
 	}
 
+	if len(req.Section) > 100 || len(req.Label) > 255 || (req.Type != "text" && req.Type != "textarea" && req.Type != "image") || (req.Type == "image" && !validImageURL(req.Value)) {
+		return c.SendStatus(400)
+	}
 	newItem := models.SiteContent{
 		Key:       req.Key,
 		Section:   req.Section,
@@ -365,6 +395,9 @@ func DeleteContent(c *fiber.Ctx) error {
 
 	var item models.SiteContent
 	if err := config.DB.Where("key = ?", key).First(&item).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return databaseFailure(c)
+		}
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"success": false,
 			"message": fmt.Sprintf("Konten dengan kunci '%s' tidak ditemukan", key),

@@ -39,3 +39,7 @@ node_modules
 out
 build
 *.tsbuildinfo
+
+**/*.dump
+**/*.sql.gz
+**/.local-ops/**

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -49,6 +50,9 @@ func Login(c *fiber.Ctx) error {
 
 	var admin models.Admin
 	if err := config.DB.Where("username = ?", req.Username).First(&admin).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return databaseFailure(c)
+		}
 		// SEC-001 Mitigation: Constant-time comparison prevents timing-based username enumeration
 		_ = bcrypt.CompareHashAndPassword([]byte(dummyBcryptHash), []byte(req.Password))
 		utils.RecordAudit(c, "LOGIN_FAILED", "AUTH", req.Username, "Percobaan login dengan kredensial tidak valid")
@@ -66,10 +70,6 @@ func Login(c *fiber.Ctx) error {
 		})
 	}
 
-	if admin.TokenVersion == 0 {
-		admin.TokenVersion = 1
-		_ = config.DB.Model(&admin).Update("token_version", 1).Error
-	}
 	tokenVersion := admin.TokenVersion
 
 	token, err := utils.GenerateToken(admin.ID, admin.Username, admin.Role, tokenVersion)
@@ -112,19 +112,19 @@ func Logout(c *fiber.Ctx) error {
 		})
 	}
 
-	username, _ := c.Locals("username").(string)
-
 	// Increment token_version atomically to revoke any active JWTs for this admin
-	if err := config.DB.Model(&models.Admin{}).Where("id = ?", userID).Update("token_version", gorm.Expr("token_version + ?", 1)).Error; err != nil {
+	if err := config.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.Admin{}).Where("id = ?", userID).Update("token_version", gorm.Expr("token_version + ?", 1)).Error; err != nil {
+			return err
+		}
+		return utils.AuditAuthTx(tx, c, "LOGOUT", fmt.Sprint(userID))
+	}); err != nil {
 		log.Printf("❌ Gagal menaikkan token_version admin %d: %v", userID, err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"success": false,
 			"message": "Gagal memproses pencabutan sesi",
 		})
 	}
-
-	// SEC-013: Record audit log for session revocation
-	utils.RecordAudit(c, "LOGOUT", "AUTH", fmt.Sprintf("%d", userID), fmt.Sprintf("Admin %s logout, seluruh sesi token dicabut", username))
 
 	return c.JSON(fiber.Map{
 		"success": true,
@@ -133,6 +133,9 @@ func Logout(c *fiber.Ctx) error {
 }
 
 func Register(c *fiber.Ctx) error {
+	if c.Locals("role") != "superadmin" {
+		return c.Status(403).JSON(fiber.Map{"success": false, "message": "Superadmin required"})
+	}
 	var req RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -172,7 +175,9 @@ func Register(c *fiber.Ctx) error {
 	}
 
 	var count int64
-	config.DB.Model(&models.Admin{}).Where("username = ?", req.Username).Count(&count)
+	if err := config.DB.Model(&models.Admin{}).Where("username = ?", req.Username).Count(&count).Error; err != nil {
+		return c.Status(503).JSON(fiber.Map{"success": false, "message": "Database unavailable"})
+	}
 	if count > 0 {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
 			"success": false,
@@ -201,15 +206,17 @@ func Register(c *fiber.Ctx) error {
 		TokenVersion: 1,
 	}
 
-	if err := config.DB.Create(&newAdmin).Error; err != nil {
+	if err := config.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&newAdmin).Error; err != nil {
+			return err
+		}
+		return utils.AuditAuthTx(tx, c, "REGISTER", fmt.Sprint(newAdmin.ID))
+	}); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"success": false,
 			"message": "Gagal menyimpan akun admin",
 		})
 	}
-
-	creator, _ := c.Locals("username").(string)
-	utils.RecordAudit(c, "REGISTER", "AUTH", fmt.Sprintf("%d", newAdmin.ID), fmt.Sprintf("Admin %s mendaftarkan admin baru %s", creator, newAdmin.Username))
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"success": true,
@@ -348,16 +355,26 @@ func ChangePassword(c *fiber.Ctx) error {
 	}
 
 	// Update password and increment token_version to invalidate old sessions (SEC-014)
-	admin.Password = string(hashedPassword)
-	admin.TokenVersion = admin.TokenVersion + 1
-	if err := config.DB.Save(&admin).Error; err != nil {
+	var result *gorm.DB
+	txErr := config.DB.Transaction(func(tx *gorm.DB) error {
+		result = tx.Model(&models.Admin{}).Where("id = ? AND password = ? AND token_version = ?", admin.ID, admin.Password, admin.TokenVersion).Updates(map[string]interface{}{"password": string(hashedPassword), "token_version": gorm.Expr("token_version + 1")})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != 1 {
+			return gorm.ErrRecordNotFound
+		}
+		return utils.AuditAuthTx(tx, c, "CHANGE_PASSWORD_SUCCESS", fmt.Sprint(admin.ID))
+	})
+	if result != nil && result.Error == nil && result.RowsAffected != 1 {
+		return c.Status(409).JSON(fiber.Map{"success": false, "message": "Session changed; sign in again"})
+	}
+	if err := txErr; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"success": false,
 			"message": "Gagal memperbarui kata sandi di sistem",
 		})
 	}
-
-	utils.RecordAudit(c, "CHANGE_PASSWORD_SUCCESS", "AUTH", fmt.Sprintf("%d", admin.ID), "Admin mengganti kata sandi dan seluruh sesi lama dicabut")
 
 	return c.JSON(fiber.Map{
 		"success": true,

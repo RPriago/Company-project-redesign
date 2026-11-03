@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"fmt"
 	"time"
 
 	"petronesia-backend/controllers"
@@ -20,7 +21,7 @@ func SetupRoutes(app *fiber.App) {
 		})
 	})
 
-	api := app.Group("/api")
+	api := app.Group("/api", middlewares.Maintenance)
 	api.Get("/health", controllers.Health)
 
 	// Rate Limiter for Login (Anti-Brute Force: Max 5 attempts per minute per IP)
@@ -28,7 +29,7 @@ func SetupRoutes(app *fiber.App) {
 		Max:        5,
 		Expiration: 1 * time.Minute,
 		KeyGenerator: func(c *fiber.Ctx) string {
-			return c.IP()
+			return middlewares.ClientIP(c)
 		},
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
@@ -43,7 +44,7 @@ func SetupRoutes(app *fiber.App) {
 		Max:        10,
 		Expiration: 10 * time.Minute,
 		KeyGenerator: func(c *fiber.Ctx) string {
-			return c.IP()
+			return middlewares.ClientIP(c)
 		},
 		LimitReached: func(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
@@ -54,8 +55,8 @@ func SetupRoutes(app *fiber.App) {
 	})
 
 	// Authentication (Public)
-	auth := api.Group("/auth")
-	auth.Post("/login", loginLimiter, controllers.Login)
+	auth := api.Group("/auth", middlewares.PrivateResponse)
+	auth.Post("/login", middlewares.Gateway, loginLimiter, controllers.Login)
 
 	// Rate Limiter for Public Read/CMS (Anti-Scraping / L7 DoS: Max 300 requests per minute per IP)
 	publicReadLimiter := limiter.New(limiter.Config{
@@ -118,7 +119,7 @@ func SetupRoutes(app *fiber.App) {
 	api.Get("/fuel-prices/sync-status", controllers.GetFuelSyncStatus)
 
 	// Protected Admin Management (Requires Bearer JWT)
-	admin := api.Group("/admin", middlewares.Protected())
+	admin := api.Group("/admin", middlewares.PrivateResponse, middlewares.Gateway, middlewares.Protected())
 	admin.Put("/fuel-prices/:id", controllers.AdminUpdateFuelPrice)
 	admin.Post("/fuel-prices/sync", controllers.ManualSyncFuelPrices)
 	admin.Get("/me", controllers.Me)
@@ -148,6 +149,7 @@ func SetupRoutes(app *fiber.App) {
 	admin.Delete("/content/:key", controllers.DeleteContent)
 
 	// Image Upload & Contacts
-	admin.Post("/upload", controllers.UploadImage)
+	uploadLimiter := limiter.New(limiter.Config{Max: 10, Expiration: 10 * time.Minute, KeyGenerator: func(c *fiber.Ctx) string { return fmt.Sprint(c.Locals("user_id")) }})
+	admin.Post("/upload", uploadLimiter, controllers.UploadImage)
 	admin.Get("/contacts", controllers.GetContacts)
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useSiteContent } from "@/lib/useSiteContent";
+
 import Image from "next/image";
 
 import { motion } from "framer-motion";
@@ -7,6 +9,7 @@ import { Leaf, ShieldCheck, HeartHandshake, CheckCircle2 } from "lucide-react";
 import EsgPathway from "@/components/home/EsgPathway";
 
 export default function SustainabilityPage() {
+  const { content } = useSiteContent();
   const esgPillars = [
     {
       title: "Lingkungan (Environmental)",
@@ -51,7 +54,7 @@ export default function SustainabilityPage() {
       {/* 1. HERO SECTION */}
       <section className="relative w-full min-h-[480px] sm:min-h-[520px] flex items-center overflow-hidden bg-[#0B132B] pt-32 sm:pt-40 pb-16 sm:pb-20">
         <Image
-          src="/images/sustainability_ccus_plant.jpg"
+          src={content.sustainability_hero_img || "/images/sustainability_ccus_plant.jpg"}
           alt="Transisi Energi Hijau & CCUS Pertamina"
           fill
           className="object-cover opacity-20"
@@ -70,12 +73,8 @@ export default function SustainabilityPage() {
             <span className="text-xs font-medium tracking-[0.14em] uppercase text-white/70 block">
               Keberlanjutan &amp; ESG
             </span>
-            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">
-              Peta Jalan Dekarbonisasi Menuju NZE 2060
-            </h1>
-            <p className="text-white/80 text-sm sm:text-base leading-relaxed">
-              Pertamina berkomitmen mewujudkan masa depan energi Indonesia yang berkelanjutan melalui integrasi prinsip Environmental, Social, and Governance (ESG) dalam seluruh rantai bisnis.
-            </p>
+            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">{content.sustainability_hero_title}</h1>
+            <p className="text-white/80 text-sm sm:text-base leading-relaxed">{content.sustainability_hero_desc}</p>
           </motion.div>
         </div>
       </section>
@@ -144,6 +143,13 @@ export default function SustainabilityPage() {
         </div>
       </section>
 
+      <section className="py-16 max-w-[1280px] mx-auto px-6 space-y-8">
+        <Image src={content.nze_img} alt={content.nze_title} width={1200} height={600} className="w-full rounded-2xl" unoptimized />
+        <h2 className="text-3xl font-bold">{content.nze_title}</h2><p>{content.nze_desc}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">{[1, 2, 3].map(i => <div key={i}><strong className="text-2xl">{content[`nze_stat_${i}_val`]}</strong><p>{content[`nze_stat_${i}_lbl`]}</p></div>)}</div>
+        <Image src={content.deb_img} alt={content.deb_title} width={1200} height={600} className="w-full rounded-2xl" unoptimized />
+        <h2 className="text-3xl font-bold">{content.deb_title}</h2><p>{content.deb_desc}</p>
+      </section>
       {/* 3. INTERACTIVE ESG PATHWAY */}
       <EsgPathway />
     </div>

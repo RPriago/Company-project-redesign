@@ -1,5 +1,7 @@
 "use client";
 
+import { useSiteContent } from "@/lib/useSiteContent";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -10,6 +12,7 @@ import {
 import Logo from "./Logo";
 
 export default function Footer() {
+  const { content } = useSiteContent();
   const pathname = usePathname();
   const isAdmin = pathname.startsWith("/admin");
 
@@ -27,27 +30,27 @@ export default function Footer() {
             </Link>
 
             <p className="text-[#94A3B8] text-sm leading-relaxed max-w-sm">
-              Badan Usaha Milik Negara yang mengelola rantai pasok energi terintegrasi dari hulu hingga hilir, menjaga kedaulatan energi nasional dan memimpin transisi menuju Net Zero Emission 2060.
+              {content.footer_tagline}
             </p>
 
             <div className="space-y-2.5 text-xs text-white/70">
               <div className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-[#ED1A2F] shrink-0 mt-0.5" />
                 <span>
-                  Grha Pertamina, Jl. Medan Merdeka Timur No. 11-13, Gambir, Jakarta Pusat 10110
+                  {content.contact_hq_address}, {content.contact_hq_city}
                 </span>
               </div>
               <div className="flex items-center gap-2.5">
                 <PhoneCall className="w-4 h-4 text-[#ED1A2F] shrink-0" />
-                <span>Pertamina Contact Center: <strong>135</strong> (Bebas Pulsa 24 Jam)</span>
+                <span>Pertamina Contact Center: <strong>{content.contact_center_num}</strong> (Bebas Pulsa 24 Jam)</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 text-[#006BB8] shrink-0" />
                 <a
-                  href="mailto:infopublik@pertamina.com"
+                  href={`mailto:${content.contact_center_email}`}
                   className="hover:text-[#ED1A2F] transition-colors"
                 >
-                  infopublik@pertamina.com
+                  {content.contact_center_email}
                 </a>
               </div>
             </div>
@@ -182,7 +185,7 @@ export default function Footer() {
 
         {/* Bottom Bar: Copyright & Compliance */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#64748B]">
-          <p>© 2026 PT Pertamina (Persero). Hak Cipta Dilindungi Undang-Undang.</p>
+          <p>{content.footer_copyright}</p>
           <div className="flex items-center gap-6">
             <span>ISO 37001 SMAP Kepatuhan Anti Penyuapan</span>
             <span>Keterbukaan Informasi Publik (PPID)</span>

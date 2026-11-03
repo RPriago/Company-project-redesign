@@ -13,9 +13,11 @@ import {
   X,
   Send,
 } from "lucide-react";
-import { fetchJobs, getErrorMessage, JobItem } from "@/lib/api";
+import { fetchJobs, getErrorMessage, JobItem, PaginationMeta } from "@/lib/api";
 
 export default function CareersPage() {
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [jobs, setJobs] = useState<JobItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,10 +28,11 @@ export default function CareersPage() {
   useEffect(() => {
     let active = true;
     const controller = new AbortController();
-    fetchJobs(undefined, controller.signal)
+    fetchJobs({ page, limit: 10 }, controller.signal)
       .then((response) => {
         if (!active) return;
         setJobs(response.data);
+        setMeta(response.meta);
         setError(null);
       })
       .catch((err: unknown) => {
@@ -44,7 +47,7 @@ export default function CareersPage() {
       active = false;
       controller.abort();
     };
-  }, [requestVersion]);
+  }, [requestVersion, page]);
 
   function retryJobs() {
     setLoading(true);
@@ -277,6 +280,11 @@ export default function CareersPage() {
 
 
       {/* MODAL LAMARAN KERJA */}
+      {meta && meta.last_page > 1 && <nav aria-label="Halaman lowongan" className="flex justify-center items-center gap-4 pb-10">
+        <button disabled={loading || page <= 1} onClick={() => { setLoading(true); setPage(p => p - 1); }} className="disabled:opacity-40">Sebelumnya</button>
+        <span>Halaman {meta.page} dari {meta.last_page}</span>
+        <button disabled={loading || page >= meta.last_page} onClick={() => { setLoading(true); setPage(p => p + 1); }} className="disabled:opacity-40">Berikutnya</button>
+      </nav>}
       <AnimatePresence>
         {selectedJob && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">

@@ -39,3 +39,7 @@ cmd/**
 uploads
 uploads/**
 tmp
+
+**/*.dump
+**/*.sql.gz
+**/.local-ops/**

@@ -1,5 +1,8 @@
 "use client";
 
+import { useSiteContent } from "@/lib/useSiteContent";
+
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   ShieldCheck,
@@ -11,6 +14,7 @@ import {
 } from "lucide-react";
 
 export default function AkhlakShowcase() {
+  const { content } = useSiteContent();
   const values = [
     {
       letter: "A",
@@ -97,10 +101,11 @@ export default function AkhlakShowcase() {
             Tata Nilai AKHLAK BUMN
           </h2>
           <p className="text-sm sm:text-base text-slate-600 mt-2">
-            Panduan moral dan etika kerja setiap insan Perwira Pertamina dalam mengemban amanah kedaulatan energi nasional.
+            {content.akhlak_desc}
           </p>
         </motion.div>
 
+        <Image src={content.akhlak_hero_img} alt="Perwira Pertamina" width={1200} height={600} className="w-full rounded-2xl mb-10" unoptimized />
         {/* 6 Grid Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {values.map((v, i) => (

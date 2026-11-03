@@ -21,6 +21,7 @@ import (
 func setupTestApp(t *testing.T) *fiber.App {
 	t.Helper()
 	t.Setenv("APP_ENV", "test")
+	t.Setenv("ADMIN_GATEWAY_SECRET", "test-gateway-secret-at-least-32-bytes")
 	t.Setenv("DATABASE_URL", "")
 	t.Setenv("DB_TYPE", "sqlite")
 	t.Setenv("SQLITE_FILE", filepath.Join(t.TempDir(), "api.db"))
@@ -49,6 +50,7 @@ func TestPublicEndpoints(t *testing.T) {
 	app := setupTestApp(t)
 
 	req := httptest.NewRequest("GET", "/api/content", nil)
+	req.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	resp, err := app.Test(req, -1)
 	if err != nil || responseStatus(resp) != 200 {
 		t.Fatalf("GET /api/content failed: status=%d, err=%v", responseStatus(resp), err)
@@ -64,6 +66,7 @@ func TestPublicEndpoints(t *testing.T) {
 	}
 
 	reqJobs := httptest.NewRequest("GET", "/api/jobs", nil)
+	reqJobs.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	respJobs, err := app.Test(reqJobs, -1)
 	if err != nil || responseStatus(respJobs) != 200 {
 		t.Fatalf("GET /api/jobs failed: status=%d, err=%v", responseStatus(respJobs), err)
@@ -78,6 +81,7 @@ func TestAdminAuthAndCRUD(t *testing.T) {
 		"password": "admin123",
 	})
 	reqLogin := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(loginBody))
+	reqLogin.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqLogin.Header.Set("Content-Type", "application/json")
 	respLogin, err := app.Test(reqLogin, -1)
 	if err != nil || responseStatus(respLogin) != 200 {
@@ -97,6 +101,7 @@ func TestAdminAuthAndCRUD(t *testing.T) {
 		},
 	})
 	reqUpdate := httptest.NewRequest("PUT", "/api/admin/content", bytes.NewReader(updatePayload))
+	reqUpdate.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqUpdate.Header.Set("Content-Type", "application/json")
 	reqUpdate.Header.Set("Authorization", "Bearer "+token)
 	respUpdate, err := app.Test(reqUpdate, -1)
@@ -110,12 +115,14 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 
 	// 1. SEC-008: Verify Job Lookup with numeric ID vs slug without DB cast errors
 	reqJobNum := httptest.NewRequest("GET", "/api/jobs/99999", nil)
+	reqJobNum.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	respJobNum, err := app.Test(reqJobNum, -1)
 	if err != nil || responseStatus(respJobNum) != 404 {
 		t.Fatalf("SEC-008: Expected 404 for non-existent numeric job ID, got %d (err: %v)", responseStatus(respJobNum), err)
 	}
 
 	reqJobSlug := httptest.NewRequest("GET", "/api/jobs/non-existent-slug", nil)
+	reqJobSlug.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	respJobSlug, err := app.Test(reqJobSlug, -1)
 	if err != nil || responseStatus(respJobSlug) != 404 {
 		t.Fatalf("SEC-008: Expected 404 for non-existent slug, got %d (err: %v)", responseStatus(respJobSlug), err)
@@ -129,6 +136,7 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 		"message": "Testing injection",
 	})
 	reqInvalidEmail := httptest.NewRequest("POST", "/api/contact", bytes.NewReader(invalidContactBody))
+	reqInvalidEmail.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqInvalidEmail.Header.Set("Content-Type", "application/json")
 	respInvalidEmail, _ := app.Test(reqInvalidEmail, -1)
 	if responseStatus(respInvalidEmail) != 400 {
@@ -142,6 +150,7 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 		"message": "Kami berminat berkolaborasi dalam proyek energi baru terbarukan.",
 	})
 	reqValidEmail := httptest.NewRequest("POST", "/api/contact", bytes.NewReader(validContactBody))
+	reqValidEmail.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqValidEmail.Header.Set("Content-Type", "application/json")
 	respValidEmail, _ := app.Test(reqValidEmail, -1)
 	if responseStatus(respValidEmail) != 201 {
@@ -155,6 +164,7 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 		"password": "admin123",
 	})
 	reqLogin := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(loginBody))
+	reqLogin.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqLogin.Header.Set("Content-Type", "application/json")
 	respLogin, _ := app.Test(reqLogin, -1)
 	var loginData struct {
@@ -169,6 +179,7 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 		"value": "some test value",
 	})
 	reqInvalidKey := httptest.NewRequest("POST", "/api/admin/content", bytes.NewReader(invalidKeyBody))
+	reqInvalidKey.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqInvalidKey.Header.Set("Content-Type", "application/json")
 	reqInvalidKey.Header.Set("Authorization", "Bearer "+token)
 	respInvalidKey, _ := app.Test(reqInvalidKey, -1)
@@ -178,6 +189,7 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 
 	// 4. SEC-013: Verify Audit Logs Endpoint
 	reqAudit := httptest.NewRequest("GET", "/api/admin/audit-logs", nil)
+	reqAudit.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqAudit.Header.Set("Authorization", "Bearer "+token)
 	respAudit, _ := app.Test(reqAudit, -1)
 	if responseStatus(respAudit) != 200 {
@@ -187,6 +199,7 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 	// 5. SEC-014: Verify Logout Token Revocation (Session Invalidation)
 	// Verify current token works
 	reqMeBefore := httptest.NewRequest("GET", "/api/admin/me", nil)
+	reqMeBefore.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqMeBefore.Header.Set("Authorization", "Bearer "+token)
 	respMeBefore, _ := app.Test(reqMeBefore, -1)
 	if responseStatus(respMeBefore) != 200 {
@@ -195,6 +208,7 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 
 	// Execute Logout
 	reqLogout := httptest.NewRequest("POST", "/api/admin/logout", nil)
+	reqLogout.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqLogout.Header.Set("Authorization", "Bearer "+token)
 	respLogout, _ := app.Test(reqLogout, -1)
 	if responseStatus(respLogout) != 200 {
@@ -203,6 +217,7 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 
 	// Verify token is now REVOKED
 	reqMeAfter := httptest.NewRequest("GET", "/api/admin/me", nil)
+	reqMeAfter.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqMeAfter.Header.Set("Authorization", "Bearer "+token)
 	respMeAfter, _ := app.Test(reqMeAfter, -1)
 	if responseStatus(respMeAfter) != 401 {
@@ -211,6 +226,7 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 
 	// 6. Test Non-numeric ID validation on Update/Delete
 	reqLogin2 := httptest.NewRequest("POST", "/api/auth/login", bytes.NewReader(loginBody))
+	reqLogin2.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqLogin2.Header.Set("Content-Type", "application/json")
 	respLogin2, _ := app.Test(reqLogin2, -1)
 	var loginData2 struct {
@@ -220,6 +236,7 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 	newToken := loginData2.Token
 
 	reqInvalidID := httptest.NewRequest("DELETE", "/api/admin/events/not-a-number", nil)
+	reqInvalidID.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqInvalidID.Header.Set("Authorization", "Bearer "+newToken)
 	respInvalidID, _ := app.Test(reqInvalidID, -1)
 	if responseStatus(respInvalidID) != 400 {
@@ -227,6 +244,7 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 	}
 
 	reqInvalidJobID := httptest.NewRequest("DELETE", "/api/admin/jobs/invalid-id-xyz", nil)
+	reqInvalidJobID.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqInvalidJobID.Header.Set("Authorization", "Bearer "+newToken)
 	respInvalidJobID, _ := app.Test(reqInvalidJobID, -1)
 	if responseStatus(respInvalidJobID) != 400 {
@@ -239,6 +257,7 @@ func TestSecVulnerabilities_008_to_014(t *testing.T) {
 		"password": "123",
 	})
 	reqWeakRegister := httptest.NewRequest("POST", "/api/admin/register", bytes.NewReader(weakRegisterBody))
+	reqWeakRegister.Header.Set("X-Admin-Gateway-Secret", "test-gateway-secret-at-least-32-bytes")
 	reqWeakRegister.Header.Set("Content-Type", "application/json")
 	reqWeakRegister.Header.Set("Authorization", "Bearer "+newToken)
 	respWeakRegister, _ := app.Test(reqWeakRegister, -1)

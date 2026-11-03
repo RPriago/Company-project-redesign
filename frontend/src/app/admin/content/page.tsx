@@ -765,6 +765,7 @@ export default function AdminContentPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "image" | "text">("all");
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -802,16 +803,11 @@ export default function AdminContentPage() {
 
   // Load content from API
   useEffect(() => {
-    const token = localStorage.getItem("petronesia_token");
-    if (!token) {
-      router.push("/admin/login");
-      return;
-    }
 
     async function loadContent() {
       setLoading(true);
       try {
-        const res = await adminFetchContent(token!);
+        const res = await adminFetchContent();
         if (res.data?.map) {
           const merged = { ...DEFAULT_SITE_CONTENT, ...res.data.map };
           setValues(merged);
@@ -839,9 +835,10 @@ export default function AdminContentPage() {
             });
           }
           setCustomFields(customs);
+          setLoaded(true);
         }
       } catch (err) {
-        console.error("Gagal memuat konten CMS:", err);
+        setFeedback({ type: "error", text: getErrorMessage(err, "Gagal memuat konten. Muat ulang sebelum menyimpan.") });
       } finally {
         setLoading(false);
       }
@@ -872,15 +869,14 @@ export default function AdminContentPage() {
   }
 
   async function handleSaveAll() {
-    const token = localStorage.getItem("petronesia_token");
-    if (!token) return;
 
+    if (!loaded) { setFeedback({ type: "error", text: "Muat konten berhasil sebelum menyimpan perubahan." }); return; }
     setSaving(true);
     setFeedback(null);
     try {
       const changes = changedContent(values, initialValues);
       if (Object.keys(changes).length === 0) return;
-      await adminBatchUpdateContent(token, changes);
+      await adminBatchUpdateContent(changes);
       setInitialValues(prev => ({ ...prev, ...changes }));
       broadcastContentUpdate(changes);
       setFeedback({
@@ -910,12 +906,10 @@ export default function AdminContentPage() {
     const file = e.target.files?.[0];
     if (!file || !targetUploadKey) return;
 
-    const token = localStorage.getItem("petronesia_token");
-    if (!token) return;
 
     setUploadingKey(targetUploadKey);
     try {
-      const res = await adminUploadImage(token, file);
+      const res = await adminUploadImage(file);
       const uploadedUrl = res.data.url;
       if (uploadedUrl) {
         handleChange(targetUploadKey, uploadedUrl);
@@ -938,8 +932,6 @@ export default function AdminContentPage() {
 
   async function handleCreateNewContent(e: React.FormEvent) {
     e.preventDefault();
-    const token = localStorage.getItem("petronesia_token");
-    if (!token) return;
 
     const trimmedKey = newContentForm.key.trim().toLowerCase().replace(/\s+/g, "_");
     if (!trimmedKey) {
@@ -948,7 +940,7 @@ export default function AdminContentPage() {
     }
 
     try {
-      await adminCreateContent(token, {
+      await adminCreateContent({
         key: trimmedKey,
         section: newContentForm.pageGroup,
         label: newContentForm.label || trimmedKey,
@@ -988,11 +980,9 @@ export default function AdminContentPage() {
   }
 
   async function handleDeleteCustomContent(key: string) {
-    const token = localStorage.getItem("petronesia_token");
-    if (!token) return;
 
     try {
-      await adminDeleteContent(token, key);
+      await adminDeleteContent(key);
       setCustomFields((prev) => prev.filter((f) => f.key !== key));
       setValues((prev) => {
         const copy = { ...prev };
@@ -1117,14 +1107,6 @@ export default function AdminContentPage() {
           </div>
 
           <div className="flex items-center gap-2.5">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="text-xs font-semibold px-3.5 py-2 rounded-full bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5 text-[#58A618]" />
-              <span className="hidden sm:inline">Tambah Konten</span>
-              <span className="sm:hidden">Tambah</span>
-            </button>
 
             <Link
               href="/"
@@ -1400,19 +1382,12 @@ export default function AdminContentPage() {
                 </h1>
                 <p className="text-xs text-slate-400 mt-1 max-w-xl">
                   {activeTab === "custom"
-                    ? "Kelola tulisan atau gambar yang dibuat khusus oleh admin"
+                    ? "Konten kustom tersimpan tetap dapat diedit. Kunci baru memerlukan pengaitan ke template halaman publik oleh pengembang."
                     : currentPageGroup.desc}
                 </p>
               </div>
 
               <div className="flex items-center gap-2 self-start sm:self-auto">
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="px-4 py-2 rounded-full bg-[#006BB8] hover:bg-[#00508F] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Tambah Item</span>
-                </button>
               </div>
             </div>
 

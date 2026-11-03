@@ -15,7 +15,7 @@ type JobVacancy struct {
 	Description  string    `json:"description" gorm:"type:text"`
 	Requirements string    `json:"requirements" gorm:"type:text"`
 	Deadline     string    `json:"deadline" gorm:"size:100"`
-	IsActive     bool      `json:"is_active" gorm:"default:true;index"`
+	IsActive     bool      `json:"is_active" gorm:"default:false;index"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

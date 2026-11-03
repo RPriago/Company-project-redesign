@@ -1,5 +1,7 @@
 "use client";
 
+import { useSiteContent } from "@/lib/useSiteContent";
+
 import { useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -7,6 +9,7 @@ import { MapPin, Phone, Send, CheckCircle2, PhoneCall } from "lucide-react";
 import { submitContactMessage } from "@/lib/api";
 
 export default function ContactPage() {
+  const { content } = useSiteContent();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -15,13 +18,14 @@ export default function ContactPage() {
     message: "",
     company_fax: "", // Honeypot field for bot defense
   });
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const offices = [
     {
       name: "Kantor Pusat (Grha Pertamina)",
-      address: "Jl. Medan Merdeka Timur No. 11-13, Gambir, Jakarta Pusat 10110, Indonesia",
+      address: `${content.contact_hq_address}, ${content.contact_hq_city}`,
       phone: "135 / +62 21 3815 111",
       email: "infopublik@pertamina.com",
     },
@@ -49,7 +53,9 @@ export default function ContactPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await submitContactMessage(formData);
+      setSubmitError(null);
+      const response = await submitContactMessage(formData);
+      if (!response.data?.success) throw new Error("Pesan gagal dikirim");
       setSuccess(true);
       setFormData({
         name: "",
@@ -60,7 +66,7 @@ export default function ContactPage() {
         company_fax: "",
       });
     } catch {
-      setSuccess(true);
+      setSubmitError("Pesan belum terkirim. Silakan coba lagi.");
     } finally {
       setLoading(false);
     }
@@ -68,10 +74,11 @@ export default function ContactPage() {
 
   return (
     <div className="flex flex-col bg-white">
+      {submitError && <div role="alert" className="p-4 text-red-700">{submitError}</div>}
       {/* 1. HERO SECTION */}
       <section className="relative w-full min-h-[480px] sm:min-h-[520px] flex items-center overflow-hidden bg-[#0B132B] pt-32 sm:pt-40 pb-16 sm:pb-20">
         <Image
-          src="/images/grha_pertamina_jakarta.jpg"
+          src={content.contact_hero_img || "/images/grha_pertamina_jakarta.jpg"}
           alt="Grha Pertamina Kantor Pusat & Call Center 135"
           fill
           className="object-cover opacity-20"
@@ -90,12 +97,8 @@ export default function ContactPage() {
             <span className="text-xs font-semibold tracking-[0.14em] uppercase text-white/70 block">
               Layanan Pelanggan &amp; Kontak Resmi
             </span>
-            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">
-              Pertamina Selalu Hadir Melayani Anda
-            </h1>
-            <p className="text-white/80 text-sm sm:text-base leading-relaxed">
-              Pusat layanan informasi publik, kemitraan bisnis energi, pengaduan konsumen SPBU, dan kanal keterbukaan informasi publik (PPID) PT Pertamina (Persero).
-            </p>
+            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">{content.contact_hero_title}</h1>
+            <p className="text-white/80 text-sm sm:text-base leading-relaxed">{content.contact_hero_desc}</p>
           </motion.div>
         </div>
       </section>
@@ -124,17 +127,17 @@ export default function ContactPage() {
 
             <div className="flex flex-col sm:flex-row items-center gap-4 shrink-0">
               <a
-                href="tel:135"
+                href={`tel:${content.contact_center_num}`}
                 className="px-8 py-3.5 rounded-full bg-[#ED1A2F] hover:bg-[#C41626] text-white font-body text-xs font-semibold shadow-xs transition-colors flex items-center gap-2.5"
               >
                 <PhoneCall className="w-4 h-4" />
-                <span>Hubungi 135</span>
+                <span>Hubungi {content.contact_center_num}</span>
               </a>
               <a
-                href="mailto:pcc135@pertamina.com"
+                href={`mailto:${content.contact_center_email}`}
                 className="px-6 py-3.5 rounded-full bg-white/10 hover:bg-white/15 text-white font-body text-xs font-semibold border border-white/15 transition-all"
               >
-                pcc135@pertamina.com
+                {content.contact_center_email}
               </a>
             </div>
           </motion.div>

@@ -1,6 +1,8 @@
 package middlewares
 
 import (
+	"errors"
+	"gorm.io/gorm"
 	"strings"
 
 	"petronesia-backend/config"
@@ -37,7 +39,11 @@ func Protected() fiber.Handler {
 		}
 
 		var admin models.Admin
-		if err := config.DB.Select("id, token_version").First(&admin, claims.UserID).Error; err != nil || admin.TokenVersion != claims.TokenVersion {
+		err = config.DB.Select("id, token_version, role").First(&admin, claims.UserID).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(503).JSON(fiber.Map{"success": false, "message": "Session service unavailable"})
+		}
+		if err != nil || admin.TokenVersion != claims.TokenVersion {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"success": false,
 				"message": "Sesi telah dicabut atau kedaluwarsa. Silakan login kembali.",
@@ -46,7 +52,7 @@ func Protected() fiber.Handler {
 
 		c.Locals("user_id", claims.UserID)
 		c.Locals("username", claims.Username)
-		c.Locals("role", claims.Role)
+		c.Locals("role", admin.Role)
 
 		return c.Next()
 	}

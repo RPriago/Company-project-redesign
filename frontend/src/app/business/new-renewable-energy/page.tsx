@@ -1,11 +1,13 @@
 "use client";
 
+import { useSiteContent } from "@/lib/useSiteContent";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 
 export default function NewRenewableEnergyPage() {
+  const { content } = useSiteContent();
   const ebtPillars = [
     {
       title: "Geothermal (PGE)",
@@ -34,7 +36,7 @@ export default function NewRenewableEnergyPage() {
       {/* 1. HERO SECTION */}
       <section className="relative w-full min-h-[480px] sm:min-h-[520px] flex items-center overflow-hidden bg-[#0B132B] pt-32 sm:pt-40 pb-16 sm:pb-20">
         <Image
-          src="/images/geothermal_plant_kamojang.jpg"
+          src={content.subholding_pge_img || "/images/geothermal_plant_kamojang.jpg"}
           alt="Energi Baru Terbarukan & Panas Bumi Pertamina (PGE)"
           fill
           className="object-cover opacity-20"
@@ -54,13 +56,9 @@ export default function NewRenewableEnergyPage() {
               Subholding Power &amp; NRE
             </span>
 
-            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">
-              Akselerasi Energi Bersih &amp; Panas Bumi
-            </h1>
+            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">{content.subholding_pge_title}</h1>
 
-            <p className="text-white/80 text-sm sm:text-base leading-relaxed">
-              Dikelola oleh PT Pertamina New &amp; Renewable Energy (Pertamina NRE) dan PT Pertamina Geothermal Energy Tbk (PGE), memimpin dekarbonisasi melalui energi panas bumi kelas dunia, tenaga surya, dan bahan bakar masa depan.
-            </p>
+            <p className="text-white/80 text-sm sm:text-base leading-relaxed">{content.subholding_pge_desc}</p>
           </motion.div>
         </div>
       </section>

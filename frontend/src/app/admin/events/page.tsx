@@ -1,16 +1,14 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import axios from "axios";
+import { adminApi as axios } from "@/lib/api";
 import { Plus, Search, Edit2, Trash2, X, Upload, Calendar, MapPin, ArrowLeft, AlertTriangle, Loader2, ExternalLink } from "lucide-react";
 import Logo from "@/components/Logo";
-import { API_BASE_URL, EventItem, getErrorMessage } from "@/lib/api";
+import { ADMIN_API_BASE_URL as API_BASE_URL, EventItem, getErrorMessage } from "@/lib/api";
 
 export default function AdminEventsCRUDPage() {
-  const router = useRouter();
   const requestSequence = useRef(0);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -48,11 +46,9 @@ export default function AdminEventsCRUDPage() {
   ];
 
   const loadEvents = useCallback(() => {
-    const token = localStorage.getItem("petronesia_token");
-    if (!token) { router.push("/admin/login"); return; }
     const sequence = ++requestSequence.current;
     return axios.get(`${API_BASE_URL}/admin/events`, {
-      headers: { Authorization: `Bearer ${token}` },
+
       params: { q: search || undefined, status: statusFilter === "all" ? undefined : statusFilter }, timeout: 65000,
     }).then(res => {
       if (sequence !== requestSequence.current) return;
@@ -61,7 +57,7 @@ export default function AdminEventsCRUDPage() {
       setLoadError(null);
     }).catch(err => { if (sequence === requestSequence.current) { setEvents([]); setLoadError(getErrorMessage(err, "Gagal memuat berita")); } })
       .finally(() => { if (sequence === requestSequence.current) setLoading(false); });
-  }, [router, search, statusFilter]);
+  }, [search, statusFilter]);
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
 
@@ -110,9 +106,7 @@ export default function AdminEventsCRUDPage() {
 
     try {
       const res = await axios.post(`${API_BASE_URL}/admin/upload`, data, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("petronesia_token")}`,
-          "Content-Type": "multipart/form-data",
+        headers: {          "Content-Type": "multipart/form-data",
         },
       });
       if (!res.data?.success || !res.data.url) throw new Error("Respons unggahan tidak valid");
@@ -132,14 +126,14 @@ export default function AdminEventsCRUDPage() {
     try {
       if (modalMode === "create") {
         await axios.post(`${API_BASE_URL}/admin/events`, formData, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("petronesia_token")}` },
+
         });
       } else if (modalMode === "edit" && editingId) {
         await axios.put(
           `${API_BASE_URL}/admin/events/${editingId}`,
           formData,
           {
-            headers: { Authorization: `Bearer ${localStorage.getItem("petronesia_token")}` },
+
           }
         );
       }
@@ -155,7 +149,7 @@ export default function AdminEventsCRUDPage() {
   async function handleDelete(id: number) {
     try {
       await axios.delete(`${API_BASE_URL}/admin/events/${id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("petronesia_token")}` },
+
       });
       loadEvents();
       setDeleteConfirmId(null);
@@ -283,7 +277,6 @@ export default function AdminEventsCRUDPage() {
                     <th className="py-3.5 px-6 font-semibold">Artikel / Cover</th>
                     <th className="py-3.5 px-6 font-semibold">Kategori</th>
                     <th className="py-3.5 px-6 font-semibold">Tanggal &amp; Lokasi</th>
-                    <th className="py-3.5 px-6 font-semibold">Pembaca</th>
                     <th className="py-3.5 px-6 font-semibold">Status</th>
                     <th className="py-3.5 px-6 font-semibold text-right">Aksi</th>
                   </tr>
@@ -338,10 +331,6 @@ export default function AdminEventsCRUDPage() {
                             <span>{ev.location}</span>
                           </div>
                         )}
-                      </td>
-
-                      <td className="py-4 px-6 font-mono text-slate-300">
-                        {ev.views}
                       </td>
 
                       <td className="py-4 px-6">

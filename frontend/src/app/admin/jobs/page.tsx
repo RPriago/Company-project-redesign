@@ -3,14 +3,12 @@
 import { getErrorMessage } from "@/lib/api";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Edit2, Trash2, CheckCircle2, AlertCircle, X, Search, ExternalLink } from "lucide-react";
 import Logo from "@/components/Logo";
 import { adminFetchJobs, adminCreateJob, adminUpdateJob, adminDeleteJob, JobItem } from "@/lib/api";
 
 export default function AdminJobsPage() {
-  const router = useRouter();
   const [loadError, setLoadError] = useState<string | null>(null);
   const [jobs, setJobs] = useState<JobItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,15 +44,13 @@ export default function AdminJobsPage() {
   ];
 
   const loadJobs = useCallback(() => {
-    const token = localStorage.getItem("petronesia_token");
-    if (!token) { router.push("/admin/login"); return; }
-    return adminFetchJobs(token).then(res => {
+    return adminFetchJobs().then(res => {
       if (!res.data?.success || !Array.isArray(res.data.data)) throw new Error("Gagal memuat lowongan");
       setJobs(res.data.data);
       setLoadError(null);
     }).catch(err => { setJobs([]); setLoadError(getErrorMessage(err, "Gagal memuat lowongan")); })
       .finally(() => setLoading(false));
-  }, [router]);
+  }, []);
 
   useEffect(() => { loadJobs(); }, [loadJobs]);
 
@@ -92,19 +88,17 @@ export default function AdminJobsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const token = localStorage.getItem("petronesia_token");
-    if (!token) return;
 
     setSubmitting(true);
     try {
       if (editingJob) {
-        await adminUpdateJob(token, editingJob.id, formData);
+        await adminUpdateJob(editingJob.id, formData);
         setFeedback({
           type: "success",
           text: `Lowongan "${formData.title}" berhasil diperbarui!`,
         });
       } else {
-        await adminCreateJob(token, formData);
+        await adminCreateJob(formData);
         setFeedback({
           type: "success",
           text: `Lowongan baru "${formData.title}" berhasil ditambahkan!`,
@@ -124,25 +118,21 @@ export default function AdminJobsPage() {
   }
 
   async function handleToggleStatus(job: JobItem) {
-    const token = localStorage.getItem("petronesia_token");
-    if (!token) return;
 
     try {
-      await adminUpdateJob(token, job.id, { is_active: !job.is_active });
+      await adminUpdateJob(job.id, { is_active: !job.is_active });
       loadJobs();
     } catch (err) {
-      console.error("Gagal toggle status:", err);
+      setFeedback({ type: "error", text: getErrorMessage(err, "Gagal mengubah status lowongan") });
     }
   }
 
   async function handleDelete(job: JobItem) {
     if (!confirm(`Yakin ingin menghapus lowongan "${job.title}"?`)) return;
 
-    const token = localStorage.getItem("petronesia_token");
-    if (!token) return;
 
     try {
-      await adminDeleteJob(token, job.id);
+      await adminDeleteJob(job.id);
       setFeedback({
         type: "success",
         text: `Lowongan "${job.title}" berhasil dihapus.`,

@@ -159,7 +159,7 @@ export default function HomePage() {
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
             <span className="text-xs font-semibold tracking-[0.2em] uppercase text-white/75 block mb-4">
-              Mandat Kedaulatan Energi Nasional
+              {content.hero_badge}
             </span>
           </motion.div>
 
@@ -199,7 +199,7 @@ export default function HomePage() {
               href="/about"
               className="w-full sm:w-auto px-7 py-3.5 rounded-full bg-white/10 hover:bg-white/15 text-white font-body text-xs sm:text-sm font-semibold border border-white/20 transition-colors backdrop-blur-md flex items-center justify-center"
             >
-              <span>Profil Perusahaan</span>
+              <span>{content.hero_secondary_text}</span>
             </Link>
           </motion.div>
         </div>

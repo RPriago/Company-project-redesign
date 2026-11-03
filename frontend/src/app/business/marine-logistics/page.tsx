@@ -1,11 +1,13 @@
 "use client";
 
+import { useSiteContent } from "@/lib/useSiteContent";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 
 export default function MarineLogisticsPage() {
+  const { content } = useSiteContent();
   const fleetHighlights = [
     { label: "Jumlah Armada Kapal", value: "300+ Unit Tanker" },
     { label: "Kapal Super Tanker VLCC", value: "Pertamina Pride & Prime" },
@@ -18,7 +20,7 @@ export default function MarineLogisticsPage() {
       {/* 1. HERO SECTION */}
       <section className="relative w-full min-h-[480px] sm:min-h-[520px] flex items-center overflow-hidden bg-[#0B132B] pt-32 sm:pt-40 pb-16 sm:pb-20">
         <Image
-          src="/images/pertamina_vlcc_tanker.jpg"
+          src={content.subholding_pis_img || "/images/pertamina_vlcc_tanker.jpg"}
           alt="Logistik Maritim Energi Armada Tanker Pertamina (PIS)"
           fill
           className="object-cover opacity-20"
@@ -38,13 +40,9 @@ export default function MarineLogisticsPage() {
               Subholding Integrated Marine Logistics
             </span>
 
-            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">
-              Armada Tanker &amp; Logistik Maritim Energi
-            </h1>
+            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">{content.subholding_pis_title}</h1>
 
-            <p className="text-white/80 text-sm sm:text-base leading-relaxed">
-              Dikelola oleh PT Pertamina International Shipping (PIS), urat nadi logistik maritim energi yang menghubungkan kepulauan Indonesia dan mengantarkan kargo energi ke pelabuhan-pelabuhan utama dunia.
-            </p>
+            <p className="text-white/80 text-sm sm:text-base leading-relaxed">{content.subholding_pis_desc}</p>
           </motion.div>
         </div>
       </section>

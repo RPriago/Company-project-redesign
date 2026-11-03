@@ -1,5 +1,7 @@
 "use client";
 
+import { useSiteContent } from "@/lib/useSiteContent";
+
 import { useState } from "react";
 import Image from "next/image";
 
@@ -9,10 +11,15 @@ import { SUBHOLDINGS_DATA } from "@/lib/api";
 import FuelPriceWidget from "@/components/home/FuelPriceWidget";
 
 export default function BusinessPage() {
+  const { content } = useSiteContent();
+  const subholdings = SUBHOLDINGS_DATA.map(sub => {
+    const key = ({ upstream: "phe", downstream: "patraniaga", power_nre: "pge", gas: "pgn", refining: "kpi", shipping: "pis" } as Record<string, string>)[sub.id];
+    return { ...sub, fullName: content[`subholding_${key}_title`] || sub.fullName, description: content[`subholding_${key}_desc`] || sub.description, image: content[`subholding_${key}_img`] };
+  });
   const [selectedSubholding, setSelectedSubholding] = useState(SUBHOLDINGS_DATA[0].id);
 
   const activeSub =
-    SUBHOLDINGS_DATA.find((s) => s.id === selectedSubholding) || SUBHOLDINGS_DATA[0];
+    subholdings.find((s) => s.id === selectedSubholding) || subholdings[0];
 
   const productsList = [
     {
@@ -52,7 +59,7 @@ export default function BusinessPage() {
       {/* 1. HERO SECTION */}
       <section className="relative w-full min-h-[480px] sm:min-h-[520px] flex items-center overflow-hidden bg-[#0B132B] pt-32 sm:pt-40 pb-16 sm:pb-20">
         <Image
-          src="/images/pertamina_hero_refinery.jpg"
+          src={content.business_hero_img || "/images/pertamina_hero_refinery.jpg"}
           alt="Bisnis Pertamina Terintegrasi"
           fill
           className="object-cover opacity-20"
@@ -70,12 +77,8 @@ export default function BusinessPage() {
             <span className="text-xs font-medium tracking-[0.14em] uppercase text-white/70 block">
               Ekosistem Bisnis Terpadu
             </span>
-            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">
-              Menghubungkan Hulu Hingga Hilir Nusantara
-            </h1>
-            <p className="text-white/80 text-sm sm:text-base leading-relaxed">
-              Pertamina mengoperasikan portofolio energi komprehensif: eksplorasi migas hulu, transmisi gas bumi, kilang Euro 5, armada logistik maritim, hingga pembangkit listrik terbarukan.
-            </p>
+            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">{content.business_hero_title}</h1>
+            <p className="text-white/80 text-sm sm:text-base leading-relaxed">{content.business_hero_desc}</p>
           </motion.div>
         </div>
       </section>
@@ -103,7 +106,7 @@ export default function BusinessPage() {
 
           {/* Subholding Pills */}
           <div className="flex flex-wrap items-center justify-center gap-2 mb-12">
-            {SUBHOLDINGS_DATA.map((sub) => {
+            {subholdings.map((sub) => {
               const isSelected = selectedSubholding === sub.id;
               return (
                 <button
@@ -148,6 +151,7 @@ export default function BusinessPage() {
                   <p className="font-body text-sm text-slate-600 leading-relaxed">
                     {activeSub.description}
                   </p>
+                  <Image src={activeSub.image} alt={activeSub.fullName} width={800} height={450} className="w-full rounded-xl object-cover" unoptimized />
 
                   <div className="space-y-3 pt-2">
                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider font-body">

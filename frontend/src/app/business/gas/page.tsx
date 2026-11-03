@@ -1,11 +1,13 @@
 "use client";
 
+import { useSiteContent } from "@/lib/useSiteContent";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 
 export default function GasPage() {
+  const { content } = useSiteContent();
   const gasStats = [
     { label: "Jaringan Pipa Transmisi", value: "12.000+ KM" },
     { label: "Penyaluran Gas Bumi", value: "900+ BBTUD" },
@@ -18,7 +20,7 @@ export default function GasPage() {
       {/* 1. HERO SECTION */}
       <section className="relative w-full min-h-[480px] sm:min-h-[520px] flex items-center overflow-hidden bg-[#0B132B] pt-32 sm:pt-40 pb-16 sm:pb-20">
         <Image
-          src="/images/natural_gas_pgn.jpg"
+          src={content.subholding_pgn_img || "/images/natural_gas_pgn.jpg"}
           alt="Infrastruktur Gas Bumi Terintegrasi Pertamina (PGN)"
           fill
           className="object-cover opacity-20"
@@ -37,13 +39,9 @@ export default function GasPage() {
               Subholding Gas
             </span>
 
-            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">
-              Infrastruktur &amp; Transmisi Gas Bumi Nasional
-            </h1>
+            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">{content.subholding_pgn_title}</h1>
 
-            <p className="text-white/80 text-sm sm:text-base leading-relaxed">
-              Dikelola oleh PT Perusahaan Gas Negara Tbk (PGN), mengoperasikan infrastruktur gas bumi terbesar di Asia Tenggara guna memasok energi transisi bersih bagi industri manufaktur, pembangkit listrik PLN, dan jutaan rumah tangga.
-            </p>
+            <p className="text-white/80 text-sm sm:text-base leading-relaxed">{content.subholding_pgn_desc}</p>
           </motion.div>
         </div>
       </section>

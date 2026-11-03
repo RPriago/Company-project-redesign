@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"gorm.io/gorm"
 	"io"
 	"log"
 	"net/http"
@@ -19,23 +21,7 @@ import (
 )
 
 // In-memory cache for ultra-fast sub-millisecond responses
-type fuelCache struct {
-	sync.RWMutex
-	allPricesJSON []byte
-	regionsJSON   []byte
-	lastUpdated   time.Time
-	cacheValid    bool
-}
-
-var globalFuelCache = &fuelCache{}
-
-func invalidateFuelCache() {
-	globalFuelCache.Lock()
-	defer globalFuelCache.Unlock()
-	globalFuelCache.cacheValid = false
-	globalFuelCache.allPricesJSON = nil
-	globalFuelCache.regionsJSON = nil
-}
+func invalidateFuelCache() { invalidatePublicCache() }
 
 // Sync Status Tracker
 type SyncStatusInfo struct {
@@ -74,25 +60,20 @@ func sanitizeQueryParam(input string) string {
 }
 
 // GetFuelPrices - Public endpoint for fuel prices with caching, filtering, and indexing
-func GetFuelPrices(c *fiber.Ctx) error {
+func GetFuelPrices(c *fiber.Ctx) error { return cachedPublic(c, uncachedFuelPrices) }
+func uncachedFuelPrices(c *fiber.Ctx) error {
 	c.Set("Cache-Control", "public, max-age=300, stale-while-revalidate=600")
 	c.Set("X-Content-Type-Options", "nosniff")
 
+	for _, key := range []string{"province", "category", "zone"} {
+		value := c.Query(key)
+		if value != "" && (len(value) > 80 || sanitizeQueryParam(value) == "") {
+			return c.SendStatus(400)
+		}
+	}
 	provinceQuery := sanitizeQueryParam(c.Query("province"))
 	categoryQuery := sanitizeQueryParam(c.Query("category"))
 	zoneQuery := sanitizeQueryParam(c.Query("zone"))
-
-	// Fast path: if no filters, return cached JSON directly
-	if provinceQuery == "" && categoryQuery == "" && zoneQuery == "" {
-		globalFuelCache.RLock()
-		if globalFuelCache.cacheValid && globalFuelCache.allPricesJSON != nil {
-			cachedBytes := globalFuelCache.allPricesJSON
-			globalFuelCache.RUnlock()
-			c.Set("Content-Type", "application/json")
-			return c.Send(cachedBytes)
-		}
-		globalFuelCache.RUnlock()
-	}
 
 	query := config.DB.Model(&models.FuelPrice{})
 
@@ -147,32 +128,14 @@ func GetFuelPrices(c *fiber.Ctx) error {
 		"data": prices,
 	}
 
-	if provinceQuery == "" && categoryQuery == "" && zoneQuery == "" {
-		if jsonBytes, err := json.Marshal(response); err == nil {
-			globalFuelCache.Lock()
-			globalFuelCache.allPricesJSON = jsonBytes
-			globalFuelCache.cacheValid = true
-			globalFuelCache.lastUpdated = time.Now()
-			globalFuelCache.Unlock()
-		}
-	}
-
 	return c.JSON(response)
 }
 
 // GetFuelRegions - Returns grouped list of zones and 38 provinces + 2 FTZs
-func GetFuelRegions(c *fiber.Ctx) error {
+func GetFuelRegions(c *fiber.Ctx) error { return cachedPublic(c, uncachedFuelRegions) }
+func uncachedFuelRegions(c *fiber.Ctx) error {
 	c.Set("Cache-Control", "public, max-age=3600, stale-while-revalidate=7200")
 	c.Set("X-Content-Type-Options", "nosniff")
-
-	globalFuelCache.RLock()
-	if globalFuelCache.cacheValid && globalFuelCache.regionsJSON != nil {
-		cachedBytes := globalFuelCache.regionsJSON
-		globalFuelCache.RUnlock()
-		c.Set("Content-Type", "application/json")
-		return c.Send(cachedBytes)
-	}
-	globalFuelCache.RUnlock()
 
 	type RegionItem struct {
 		Province  string `json:"province"`
@@ -230,12 +193,6 @@ func GetFuelRegions(c *fiber.Ctx) error {
 		"zones": grouped,
 	}
 
-	if jsonBytes, err := json.Marshal(response); err == nil {
-		globalFuelCache.Lock()
-		globalFuelCache.regionsJSON = jsonBytes
-		globalFuelCache.Unlock()
-	}
-
 	return c.JSON(response)
 }
 
@@ -271,7 +228,7 @@ func ManualSyncFuelPrices(c *fiber.Ctx) error {
 	))
 
 	globalSyncStatus.RLock()
-	st := *globalSyncStatus
+	st := fiber.Map{"source_url": globalSyncStatus.SourceURL, "last_sync_time": globalSyncStatus.LastSyncTime, "last_sync_status": globalSyncStatus.LastSyncStatus, "sync_message": globalSyncStatus.SyncMessage, "effective_period": globalSyncStatus.EffectivePeriod, "total_regions": globalSyncStatus.TotalRegions, "auto_scheduler_active": globalSyncStatus.AutoSchedulerActive}
 	globalSyncStatus.RUnlock()
 
 	return c.JSON(fiber.Map{
@@ -287,6 +244,9 @@ func AdminUpdateFuelPrice(c *fiber.Ctx) error {
 	var existing models.FuelPrice
 
 	if err := config.DB.First(&existing, "id = ?", id).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return databaseFailure(c)
+		}
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"success": false,
 			"message": "Data harga BBM tidak ditemukan",
@@ -405,6 +365,7 @@ type pertaminaPostResponse struct {
 // Pertamina Patra Niaga's content engine (backing https://pertaminapatraniaga.com/page/harga-terbaru-bbm)
 // and applies month-start adjustments without requiring third-party APIs.
 func SyncPricesFromOfficialWeb() error {
+	defer invalidateFuelCache()
 	apiURL := "https://pertaminapatraniaga.com/api/api/v1/post/get-by-slug/page/harga-terbaru-bbm"
 	client := &http.Client{
 		Timeout: 15 * time.Second,
@@ -545,13 +506,15 @@ func SyncPricesFromOfficialWeb() error {
 						}
 
 						if fuelType != "" {
-							config.DB.Model(&models.FuelPrice{}).
+							if err := config.DB.Model(&models.FuelPrice{}).
 								Where("province = ? AND fuel_type = ?", province, fuelType).
 								Updates(map[string]interface{}{
 									"price":          price,
 									"effective_date": effectiveDate,
 									"updated_at":     now,
-								})
+								}).Error; err != nil {
+								return err
+							}
 						}
 					}
 				}
@@ -593,6 +556,7 @@ func updateSyncStatus(status string, message string) {
 
 // applyOfficialRateTiers provides an authoritative multi-tier fallback matching Kepmen ESDM / Pertamina Patra Niaga
 func applyOfficialRateTiers(effectiveDate string) error {
+	defer invalidateFuelCache()
 	type TierPricing struct {
 		Pertamax int
 		Turbo    int
@@ -636,93 +600,135 @@ func applyOfficialRateTiers(effectiveDate string) error {
 	now := time.Now()
 
 	// Update Pertalite nationwide (Rp 10.000)
-	config.DB.Model(&models.FuelPrice{}).Where("fuel_type = ?", "Pertalite").Updates(map[string]interface{}{
+	if err := config.DB.Model(&models.FuelPrice{}).Where("fuel_type = ?", "Pertalite").Updates(map[string]interface{}{
 		"price":          10000,
 		"effective_date": effectiveDate,
 		"updated_at":     now,
-	})
+	}).Error; err != nil {
+		return err
+	}
 
 	// Update Biosolar nationwide (Rp 6.800)
-	config.DB.Model(&models.FuelPrice{}).Where("fuel_type = ?", "Biosolar").Updates(map[string]interface{}{
+	if err := config.DB.Model(&models.FuelPrice{}).Where("fuel_type = ?", "Biosolar").Updates(map[string]interface{}{
 		"price":          6800,
 		"effective_date": effectiveDate,
 		"updated_at":     now,
-	})
+	}).Error; err != nil {
+		return err
+	}
 
 	// Update Pertamax Green 95 (Rp 19.150)
-	config.DB.Model(&models.FuelPrice{}).Where("fuel_type = ?", "Pertamax Green 95").Updates(map[string]interface{}{
+	if err := config.DB.Model(&models.FuelPrice{}).Where("fuel_type = ?", "Pertamax Green 95").Updates(map[string]interface{}{
 		"price":          19150,
 		"effective_date": effectiveDate,
 		"updated_at":     now,
-	})
+	}).Error; err != nil {
+		return err
+	}
 
 	// PBBKB 5% Provinces: Jawa, Bali, NTB, NTT, Aceh
 	p5 := []string{
 		"DKI Jakarta", "Banten", "Jawa Barat", "Jawa Tengah", "D.I. Yogyakarta", "Jawa Timur", "Bali",
 		"Aceh", "Nusa Tenggara Barat (NTB)", "Nusa Tenggara Timur (NTT)",
 	}
-	config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p5, "Pertamax").Updates(map[string]interface{}{
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p5, "Pertamax").Updates(map[string]interface{}{
 		"price": tiers["5"].Pertamax, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p5, "Pertamax Turbo").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p5, "Pertamax Turbo").Updates(map[string]interface{}{
 		"price": tiers["5"].Turbo, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p5, "Dexlite").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p5, "Dexlite").Updates(map[string]interface{}{
 		"price": tiers["5"].Dexlite, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p5, "Pertamina Dex").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p5, "Pertamina Dex").Updates(map[string]interface{}{
 		"price": tiers["5"].Dex, "effective_date": effectiveDate, "updated_at": now,
-	})
+	}).Error; err != nil {
+		return err
+	}
 
 	// PBBKB 10% Provinces: Riau, Kepri, Bengkulu, Kalsel
 	p10 := []string{"Riau", "Kepulauan Riau", "Bengkulu", "Kalimantan Selatan"}
-	config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p10, "Pertamax").Updates(map[string]interface{}{
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p10, "Pertamax").Updates(map[string]interface{}{
 		"price": tiers["10"].Pertamax, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p10, "Pertamax Turbo").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p10, "Pertamax Turbo").Updates(map[string]interface{}{
 		"price": tiers["10"].Turbo, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p10, "Dexlite").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p10, "Dexlite").Updates(map[string]interface{}{
 		"price": tiers["10"].Dexlite, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p10, "Pertamina Dex").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province IN ? AND fuel_type = ?", p10, "Pertamina Dex").Updates(map[string]interface{}{
 		"price": tiers["10"].Dex, "effective_date": effectiveDate, "updated_at": now,
-	})
+	}).Error; err != nil {
+		return err
+	}
 
 	// Free Trade Zones
-	config.DB.Model(&models.FuelPrice{}).Where("province = ? AND fuel_type = ?", "Kawasan Bebas Batam", "Pertamax").Updates(map[string]interface{}{
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province = ? AND fuel_type = ?", "Kawasan Bebas Batam", "Pertamax").Updates(map[string]interface{}{
 		"price": tiers["batam"].Pertamax, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("province = ? AND fuel_type = ?", "Kawasan Bebas Batam", "Pertamax Turbo").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province = ? AND fuel_type = ?", "Kawasan Bebas Batam", "Pertamax Turbo").Updates(map[string]interface{}{
 		"price": tiers["batam"].Turbo, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("province = ? AND fuel_type = ?", "Kawasan Bebas Batam", "Dexlite").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province = ? AND fuel_type = ?", "Kawasan Bebas Batam", "Dexlite").Updates(map[string]interface{}{
 		"price": tiers["batam"].Dexlite, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("province = ? AND fuel_type = ?", "Kawasan Bebas Batam", "Pertamina Dex").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province = ? AND fuel_type = ?", "Kawasan Bebas Batam", "Pertamina Dex").Updates(map[string]interface{}{
 		"price": tiers["batam"].Dex, "effective_date": effectiveDate, "updated_at": now,
-	})
+	}).Error; err != nil {
+		return err
+	}
 
-	config.DB.Model(&models.FuelPrice{}).Where("province = ? AND fuel_type = ?", "Kawasan Bebas Sabang", "Pertamax").Updates(map[string]interface{}{
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province = ? AND fuel_type = ?", "Kawasan Bebas Sabang", "Pertamax").Updates(map[string]interface{}{
 		"price": tiers["sabang"].Pertamax, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("province = ? AND fuel_type = ?", "Kawasan Bebas Sabang", "Dexlite").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("province = ? AND fuel_type = ?", "Kawasan Bebas Sabang", "Dexlite").Updates(map[string]interface{}{
 		"price": tiers["sabang"].Dexlite, "effective_date": effectiveDate, "updated_at": now,
-	})
+	}).Error; err != nil {
+		return err
+	}
 
 	// PBBKB 7.5% Provinces (All remaining Sumatera, Kalimantan, Sulawesi, Maluku, Papua)
-	config.DB.Model(&models.FuelPrice{}).Where("pbbkb_rate = ? AND fuel_type = ?", "7.5%", "Pertamax").Updates(map[string]interface{}{
+	if err := config.DB.Model(&models.FuelPrice{}).Where("pbbkb_rate = ? AND fuel_type = ?", "7.5%", "Pertamax").Updates(map[string]interface{}{
 		"price": tiers["7.5"].Pertamax, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("pbbkb_rate = ? AND fuel_type = ?", "7.5%", "Pertamax Turbo").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("pbbkb_rate = ? AND fuel_type = ?", "7.5%", "Pertamax Turbo").Updates(map[string]interface{}{
 		"price": tiers["7.5"].Turbo, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("pbbkb_rate = ? AND fuel_type = ?", "7.5%", "Dexlite").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("pbbkb_rate = ? AND fuel_type = ?", "7.5%", "Dexlite").Updates(map[string]interface{}{
 		"price": tiers["7.5"].Dexlite, "effective_date": effectiveDate, "updated_at": now,
-	})
-	config.DB.Model(&models.FuelPrice{}).Where("pbbkb_rate = ? AND fuel_type = ?", "7.5%", "Pertamina Dex").Updates(map[string]interface{}{
+	}).Error; err != nil {
+		return err
+	}
+	if err := config.DB.Model(&models.FuelPrice{}).Where("pbbkb_rate = ? AND fuel_type = ?", "7.5%", "Pertamina Dex").Updates(map[string]interface{}{
 		"price": tiers["7.5"].Dex, "effective_date": effectiveDate, "updated_at": now,
-	})
+	}).Error; err != nil {
+		return err
+	}
 
 	return nil
 }

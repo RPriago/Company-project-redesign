@@ -10,6 +10,7 @@ import (
 	"os"
 	"petronesia-backend/models"
 	"strings"
+	"time"
 )
 
 var DB *gorm.DB
@@ -22,7 +23,7 @@ func OpenDatabase() (*gorm.DB, error) {
 	if production && databaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required in production")
 	}
-	cfg := &gorm.Config{Logger: logger.Default.LogMode(logger.Warn)}
+	cfg := &gorm.Config{Logger: logger.New(log.New(os.Stdout, "", log.LstdFlags), logger.Config{LogLevel: logger.Warn, SlowThreshold: 200 * time.Millisecond, ParameterizedQueries: true})}
 	var db *gorm.DB
 	var err error
 	if databaseURL != "" {
@@ -59,6 +60,15 @@ func OpenDatabase() (*gorm.DB, error) {
 	}
 	if err != nil {
 		return nil, fmt.Errorf("database connection failed; no fallback database was created")
+	}
+	if sqlDB, poolErr := db.DB(); poolErr == nil && db.Dialector.Name() == "postgres" {
+		sqlDB.SetMaxOpenConns(5)
+		sqlDB.SetMaxIdleConns(2)
+		sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+		sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	}
+	if err := installOperationDeadlines(db); err != nil {
+		return nil, err
 	}
 	if err := InitializeSchema(db); err != nil {
 		return nil, err

@@ -22,6 +22,8 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-}
       - DB_NAME=${DB_NAME:-}
       - JWT_SECRET=${JWT_SECRET:-}
+      - ADMIN_GATEWAY_SECRET=${ADMIN_GATEWAY_SECRET:-}
+      - MAINTENANCE_MODE=${MAINTENANCE_MODE:-false}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 15s
@@ -44,6 +46,9 @@ services:
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
+      - BACKEND_API_URL=http://backend:8080/api
+      - ADMIN_GATEWAY_SECRET=${ADMIN_GATEWAY_SECRET:-}
+      - CSP_MODE=${CSP_MODE:-report-only}
       - NODE_ENV=production
       - PORT=3000
     depends_on:

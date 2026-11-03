@@ -72,7 +72,16 @@ func safeUploadError(err error) string {
 }
 
 // POST /api/admin/upload. Image bytes go directly to Cloudinary, never local disk.
+var uploadSlots = make(chan struct{}, 2)
+
 func UploadImage(c *fiber.Ctx) error {
+	select {
+	case uploadSlots <- struct{}{}:
+		defer func() { <-uploadSlots }()
+	default:
+		return c.Status(429).JSON(fiber.Map{"success": false, "message": "Upload capacity reached; try again later"})
+	}
+
 	fail := func(status int, message string) error {
 		return c.Status(status).JSON(fiber.Map{"success": false, "message": message})
 	}

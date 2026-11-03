@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Search, Calendar, Eye, ArrowRight, Filter, ChevronLeft, ChevronRight, Newspaper } from "lucide-react";
+import { Search, Calendar, ArrowRight, Filter, ChevronLeft, ChevronRight, Newspaper } from "lucide-react";
 import { fetchEvents, EventItem, PaginationMeta, getErrorMessage } from "@/lib/api";
 
 export default function EventsPage() {
@@ -218,11 +218,6 @@ export default function EventsPage() {
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-slate-400" />
                         <span>{new Date(item.event_date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span>
-                      </div>
-                      <span>•</span>
-                      <div className="flex items-center gap-1.5">
-                        <Eye className="w-3.5 h-3.5 text-slate-400" />
-                        <span>{item.views} views</span>
                       </div>
                     </div>
 

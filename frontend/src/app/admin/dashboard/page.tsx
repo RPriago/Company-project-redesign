@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import axios from "axios";
-import { FileText, CheckCircle, Eye, Plus, ArrowRight, LogOut, ExternalLink, ShieldCheck, Image as ImageIcon, Briefcase } from "lucide-react";
+import { adminApi as axios } from "@/lib/api";
+import { FileText, CheckCircle, Plus, ArrowRight, LogOut, ExternalLink, ShieldCheck, Image as ImageIcon, Briefcase } from "lucide-react";
 import Logo from "@/components/Logo";
-import { API_BASE_URL, EventItem, getErrorMessage } from "@/lib/api";
+import { ADMIN_API_BASE_URL as API_BASE_URL, EventItem, getErrorMessage } from "@/lib/api";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -15,7 +15,6 @@ export default function AdminDashboardPage() {
     total_events: 0,
     published_events: 0,
     draft_events: 0,
-    total_views: 0,
     total_jobs: 0,
     active_jobs: 0,
     total_contents: 0,
@@ -25,24 +24,16 @@ export default function AdminDashboardPage() {
   const [recentEvents, setRecentEvents] = useState<EventItem[]>([]);
 
   useEffect(() => {
-    const token = localStorage.getItem("petronesia_token");
-    if (!token) {
-      router.push("/admin/login");
-      return;
-    }
 
     let active = true;
-    axios.get(`${API_BASE_URL}/admin/stats`, { headers: { Authorization: `Bearer ${token}` }, timeout: 65000 })
+    axios.get(`${API_BASE_URL}/admin/stats`, {  timeout: 65000 })
       .then(res => {
         if (!active) return;
         if (!res.data?.success || !res.data.data) throw new Error("Gagal memuat dashboard");
         setStats(res.data.data);
         setRecentEvents(res.data.data.recent_events || []);
         setError(null);
-        try {
-          const saved = localStorage.getItem("petronesia_admin");
-          if (saved) setAdminUser(JSON.parse(saved));
-        } catch {}
+        axios.get(`${API_BASE_URL}/admin/me`).then(result => setAdminUser(result.data.admin)).catch(() => {});
       })
       .catch(err => { if (active) setError(getErrorMessage(err, "Gagal memuat dashboard")); });
     return () => { active = false; };
@@ -50,21 +41,10 @@ export default function AdminDashboardPage() {
 
   async function handleLogout() {
     try {
-      const token = localStorage.getItem("petronesia_token");
-      if (token) {
-        await axios.post(`${API_BASE_URL}/admin/logout`, {}, {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 3000,
-        });
-      }
-    } catch {
-      // Ignore network errors and proceed with client cleanup
-    } finally {
-      localStorage.removeItem("petronesia_token");
-      localStorage.removeItem("petronesia_admin");
-      document.cookie = "petronesia_token=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-      router.push("/admin/login");
-    }
+      await axios.post(`${API_BASE_URL}/admin/logout`, {});
+      router.replace("/admin/login");
+      router.refresh();
+    } catch (err) { setError(getErrorMessage(err, "Gagal keluar. Silakan coba lagi.")); }
   }
 
   return (
@@ -204,7 +184,7 @@ export default function AdminDashboardPage() {
               </p>
             </div>
             <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-between text-xs font-semibold text-[#ED1A2F]">
-              <span>{stats.active_jobs || 5} Posisi Sedang Dibuka</span>
+              <span>{stats.active_jobs} Posisi Sedang Dibuka</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
           </Link>
@@ -242,23 +222,13 @@ export default function AdminDashboardPage() {
             </div>
             <div>
               <span className="text-xl sm:text-2xl font-bold text-white block">
-                {stats.active_jobs || 5}
+                {stats.active_jobs}
               </span>
               <span className="text-xs text-slate-400 font-medium">Loker Aktif</span>
             </div>
           </div>
 
-          <div className="bg-[#111C3D]/80 p-5 rounded-2xl border border-white/10 flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-white/10 text-slate-200 border border-white/15 flex items-center justify-center shrink-0">
-              <Eye className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-xl sm:text-2xl font-bold text-white block">
-                {stats.total_views.toLocaleString("id-ID")}
-              </span>
-              <span className="text-xs text-slate-400 font-medium">Total Pembaca</span>
-            </div>
-          </div>
+
         </div>
 
         {/* Recent Events Table */}
@@ -286,7 +256,6 @@ export default function AdminDashboardPage() {
                   <th className="pb-3 font-semibold">Judul Berita</th>
                   <th className="pb-3 font-semibold">Kategori</th>
                   <th className="pb-3 font-semibold">Tanggal</th>
-                  <th className="pb-3 font-semibold">Pembaca</th>
                   <th className="pb-3 font-semibold">Status</th>
                 </tr>
               </thead>
@@ -307,9 +276,6 @@ export default function AdminDashboardPage() {
                         month: "short",
                         year: "numeric",
                       })}
-                    </td>
-                    <td className="py-3.5 pr-4 text-slate-300 font-mono">
-                      {ev.views}
                     </td>
                     <td className="py-3.5">
                       <span

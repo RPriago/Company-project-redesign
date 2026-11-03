@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
+	"gorm.io/gorm"
 	"math"
 	"regexp"
 	"strconv"
@@ -27,6 +29,17 @@ func generateSlug(title string) string {
 
 // GET /api/events (Public)
 func GetEvents(c *fiber.Ctx) error {
+	if len(c.Path()) >= 11 && c.Path()[:11] == "/api/admin/" {
+		return uncachedGetEvents(c)
+	}
+	return cachedPublic(c, uncachedGetEvents)
+}
+func uncachedGetEvents(c *fiber.Ctx) error {
+	order := c.Query("order", "event_date desc")
+	if order != "event_date desc" && order != "event_date asc" && order != "created_at desc" {
+		return c.SendStatus(400)
+	}
+
 	var events []models.Event
 	db := config.DB.Model(&models.Event{}).Where("is_published = ?", true)
 
@@ -42,7 +55,9 @@ func GetEvents(c *fiber.Ctx) error {
 	}
 
 	var total int64
-	db.Count(&total)
+	if err := db.Count(&total).Error; err != nil {
+		return databaseFailure(c)
+	}
 
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	if page < 1 {
@@ -52,10 +67,14 @@ func GetEvents(c *fiber.Ctx) error {
 	if limit < 1 || limit > 50 {
 		limit = 9
 	}
+	if page > 1000000 {
+		return c.SendStatus(400)
+	}
 	offset := (page - 1) * limit
 
-	order := c.Query("order", "event_date desc")
-	db.Order(order).Offset(offset).Limit(limit).Find(&events)
+	if err := db.Order(order).Offset(offset).Limit(limit).Find(&events).Error; err != nil {
+		return databaseFailure(c)
+	}
 
 	lastPage := int(math.Ceil(float64(total) / float64(limit)))
 	if lastPage < 1 {
@@ -76,25 +95,35 @@ func GetEvents(c *fiber.Ctx) error {
 
 // GET /api/events/:slug (Public)
 func GetEventBySlug(c *fiber.Ctx) error {
+	if len(c.Path()) >= 11 && c.Path()[:11] == "/api/admin/" {
+		return uncachedGetEventBySlug(c)
+	}
+	return cachedPublic(c, uncachedGetEventBySlug)
+}
+func uncachedGetEventBySlug(c *fiber.Ctx) error {
 	slug := c.Params("slug")
 	var event models.Event
 
 	if err := config.DB.Where("slug = ? AND is_published = ?", slug, true).First(&event).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return databaseFailure(c)
+		}
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"success": false,
 			"message": "Berita atau event tidak ditemukan",
 		})
 	}
 
-	// Increment view count
-	config.DB.Model(&event).UpdateColumn("views", event.Views+1)
+	// Public article reads never modify application data.
 
 	// Fetch related articles (same category or recent)
 	var related []models.Event
-	config.DB.Where("id != ? AND is_published = ?", event.ID, true).
+	if err := config.DB.Where("id != ? AND is_published = ?", event.ID, true).
 		Order("created_at desc").
 		Limit(3).
-		Find(&related)
+		Find(&related).Error; err != nil {
+		return databaseFailure(c)
+	}
 
 	return c.JSON(fiber.Map{
 		"success": true,
@@ -126,16 +155,26 @@ func AdminGetEvents(c *fiber.Ctx) error {
 	}
 
 	var total int64
-	db.Count(&total)
+	if err := db.Count(&total).Error; err != nil {
+		return databaseFailure(c)
+	}
 
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	if page < 1 {
 		page = 1
 	}
 	limit, _ := strconv.Atoi(c.Query("limit", "10"))
+	if limit < 1 || limit > 50 {
+		limit = 10
+	}
+	if page > 1000000 {
+		return c.SendStatus(400)
+	}
 	offset := (page - 1) * limit
 
-	db.Order("created_at desc").Offset(offset).Limit(limit).Find(&events)
+	if err := db.Order("created_at desc").Offset(offset).Limit(limit).Find(&events).Error; err != nil {
+		return databaseFailure(c)
+	}
 
 	lastPage := int(math.Ceil(float64(total) / float64(limit)))
 	if lastPage < 1 {
@@ -176,7 +215,7 @@ func CreateEvent(c *fiber.Ctx) error {
 		})
 	}
 
-	if strings.TrimSpace(req.Title) == "" {
+	if !validEvent(req) || strings.TrimSpace(req.Title) == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"success": false,
 			"message": "Judul berita / event wajib diisi",
@@ -191,7 +230,9 @@ func CreateEvent(c *fiber.Ctx) error {
 	// Ensure unique slug
 	var existing models.Event
 	if err := config.DB.Where("slug = ?", slug).First(&existing).Error; err == nil {
-		slug = fmt.Sprintf("%s-%d", slug, time.Now().Unix()%10000)
+		slug = fmt.Sprintf("%s-%d", slug, time.Now().UnixNano())
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return databaseFailure(c)
 	}
 
 	var eventDate time.Time
@@ -199,7 +240,7 @@ func CreateEvent(c *fiber.Ctx) error {
 		var parseErr error
 		eventDate, parseErr = time.Parse("2006-01-02", req.EventDate)
 		if parseErr != nil {
-			eventDate = time.Now()
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "Invalid event_date"})
 		}
 	} else {
 		eventDate = time.Now()
@@ -259,6 +300,7 @@ func CreateEvent(c *fiber.Ctx) error {
 		})
 	}
 
+	invalidatePublicCache()
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"success": true,
 		"message": "Berita / event berhasil ditambahkan",
@@ -278,6 +320,9 @@ func UpdateEvent(c *fiber.Ctx) error {
 	var event models.Event
 
 	if err := config.DB.First(&event, id).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return databaseFailure(c)
+		}
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"success": false,
 			"message": "Data berita / event tidak ditemukan",
@@ -292,8 +337,27 @@ func UpdateEvent(c *fiber.Ctx) error {
 		})
 	}
 
-	if req.Title != "" {
+	if !validEvent(req) {
+		return c.SendStatus(400)
+	}
+	var fields map[string]interface{}
+	if err := c.BodyParser(&fields); err != nil {
+		return c.SendStatus(400)
+	}
+	if _, present := fields["title"]; present {
+		if strings.TrimSpace(req.Title) == "" {
+			return c.SendStatus(400)
+		}
 		event.Title = req.Title
+	}
+	for key, target := range map[string]*string{"excerpt": &event.Excerpt, "description": &event.Description, "location": &event.Location, "image_url": &event.ImageURL} {
+		if _, present := fields[key]; present {
+			if value, ok := fields[key].(string); ok {
+				*target = value
+			} else {
+				return c.SendStatus(400)
+			}
+		}
 	}
 	if req.Excerpt != "" {
 		event.Excerpt = req.Excerpt
@@ -330,6 +394,7 @@ func UpdateEvent(c *fiber.Ctx) error {
 		})
 	}
 
+	invalidatePublicCache()
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Berita / event berhasil diperbarui",
@@ -349,6 +414,9 @@ func DeleteEvent(c *fiber.Ctx) error {
 	var event models.Event
 
 	if err := config.DB.First(&event, id).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return databaseFailure(c)
+		}
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"success": false,
 			"message": "Data berita / event tidak ditemukan",
@@ -362,6 +430,7 @@ func DeleteEvent(c *fiber.Ctx) error {
 		})
 	}
 
+	invalidatePublicCache()
 	return c.JSON(fiber.Map{
 		"success": true,
 		"message": "Berita / event berhasil dihapus",

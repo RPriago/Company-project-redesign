@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import {
   Calendar,
   MapPin,
-  Eye,
+
   ArrowLeft,
   Share2,
   Check,
@@ -171,10 +171,6 @@ function EventDetail({ slug }: { slug: string }) {
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1.5 font-medium text-slate-400">
-                <Eye className="w-4 h-4" />
-                {item.views} pembaca
-              </span>
 
               <button
                 onClick={handleCopy}

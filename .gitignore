@@ -25,3 +25,8 @@ DEPLOYMENT_URLS.local.md
 *.[mM][dD]
 ![rR][eE][aA][dD][mM][eE].[mM][dD]
 /docs/
+
+# Local migration/export material must never be published.
+.local-ops/
+**/*.dump
+**/*.sql.gz

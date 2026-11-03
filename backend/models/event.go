@@ -14,7 +14,7 @@ type Event struct {
 	EventDate   time.Time  `json:"event_date"`
 	Location    string     `json:"location" gorm:"size:200"`
 	ImageURL    string     `json:"image_url" gorm:"size:500"`
-	IsPublished bool       `json:"is_published" gorm:"default:true;index"`
+	IsPublished bool       `json:"is_published" gorm:"default:false;index"`
 	Views       int        `json:"views" gorm:"default:0"`
 	PublishedAt *time.Time `json:"published_at"`
 	CreatedBy   uint       `json:"created_by"`

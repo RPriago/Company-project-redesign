@@ -108,8 +108,8 @@ flowchart LR
 
 ### Requirements
 
-- Go 1.26 or later.
-- Node.js 22.6 or later and npm, including support for the test script's `--experimental-strip-types` flag.
+- Go 1.26.10 or later.
+- Node.js 24 and npm, including support for the test script's `--experimental-strip-types` flag.
 - PostgreSQL for administrator setup, or SQLite for browsing the public site locally.
 - Docker with Compose if using the container setup.
 - A Cloudinary account if testing uploads.
@@ -150,7 +150,8 @@ Edit `backend/.env`:
 APP_ENV=development
 PORT=8080
 DATABASE_URL=postgresql://petronesia:local-development-only@localhost:5432/petronesia?sslmode=disable
-JWT_SECRET=replace-with-a-random-secret
+JWT_SECRET=replace-with-at-least-32-random-bytes
+ADMIN_GATEWAY_SECRET=replace-with-a-shared-random-secret
 ALLOWED_ORIGINS=http://localhost:3000
 # Optional; required for image uploads:
 # CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME
@@ -190,6 +191,9 @@ Create `frontend/.env.local`:
 
 ```dotenv
 NEXT_PUBLIC_API_URL=http://localhost:8080/api
+BACKEND_API_URL=http://localhost:8080/api
+ADMIN_GATEWAY_SECRET=use-the-same-value-as-the-backend
+CSP_MODE=report-only
 ```
 
 ```bash
@@ -227,13 +231,17 @@ NEXT_PUBLIC_API_URL=https://company-project-redesign.onrender.com/api
 
 Use the exact key `NEXT_PUBLIC_API_URL`. This is a public URL, so Vercel's **Config** type is appropriate. Set it for each deployed environment that needs API access. **Redeploy the frontend after changing it**: the URL is included during the build.
 
+The Next.js server also requires `BACKEND_API_URL=https://company-project-redesign.onrender.com/api` and `ADMIN_GATEWAY_SECRET` matching Render. These are server-only variables; never prefix them with `NEXT_PUBLIC_`. Start with `CSP_MODE=report-only`, verify the browser console, then use `CSP_MODE=enforce`. Administrator sessions use HttpOnly cookies through the same-origin gateway. Existing browser tokens are cleared and administrators must sign in again after this release.
+
 ### Backend variables — Render
 
 ```dotenv
 APP_ENV=production
 PORT=8080
 DATABASE_URL=postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require
-JWT_SECRET=YOUR_RANDOM_SECRET
+JWT_SECRET=YOUR_RANDOM_SECRET_AT_LEAST_32_BYTES
+ADMIN_GATEWAY_SECRET=YOUR_SHARED_RANDOM_GATEWAY_SECRET
+MAINTENANCE_MODE=false
 ALLOWED_ORIGINS=https://company-project-redesign-two.vercel.app
 CLOUDINARY_URL=cloudinary://API_KEY:API_SECRET@CLOUD_NAME
 ```

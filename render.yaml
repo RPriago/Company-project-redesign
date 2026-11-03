@@ -29,3 +29,7 @@ services:
         sync: false
       - key: CLOUDINARY_URL
         sync: false
+      - key: ADMIN_GATEWAY_SECRET
+        sync: false
+      - key: MAINTENANCE_MODE
+        value: "false"

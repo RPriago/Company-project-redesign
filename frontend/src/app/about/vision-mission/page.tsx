@@ -1,11 +1,13 @@
 "use client";
 
+import { useSiteContent } from "@/lib/useSiteContent";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 
 export default function VisionMissionPage() {
+  const { content } = useSiteContent();
   const missionPoints = [
     {
       title: "Kemandirian Pasokan Energi Nasional",
@@ -77,7 +79,7 @@ export default function VisionMissionPage() {
             </div>
 
             <h2 className="font-heading text-2xl sm:text-4xl lg:text-[40px] font-semibold text-slate-900 leading-[1.25] tracking-tight">
-              &ldquo;Menjadi Perusahaan Energi Nasional Kelas Dunia yang Ramah Lingkungan, Kompetitif, dan Berdaulat.&rdquo;
+              {content.about_vision}
             </h2>
 
             <p className="text-slate-600 text-sm sm:text-base leading-relaxed pt-4 border-t border-slate-100">
@@ -111,7 +113,7 @@ export default function VisionMissionPage() {
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {missionPoints.map((item, idx) => (
+            {(content.about_mission ? content.about_mission.split("\n").filter(Boolean).map(desc => ({ title: "Misi Perusahaan", desc })) : missionPoints).map((item, idx) => (
               <motion.div
                 key={idx}
                 initial={{ opacity: 0, y: 20 }}

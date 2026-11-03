@@ -121,7 +121,9 @@ func SubmitContact(c *fiber.Ctx) error {
 
 func GetContacts(c *fiber.Ctx) error {
 	var messages []models.ContactMessage
-	config.DB.Order("created_at desc").Limit(50).Find(&messages)
+	if err := config.DB.Order("created_at desc").Limit(50).Find(&messages).Error; err != nil {
+		return databaseFailure(c)
+	}
 
 	return c.JSON(fiber.Map{
 		"success": true,

@@ -1,11 +1,13 @@
 "use client";
 
+import { useSiteContent } from "@/lib/useSiteContent";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 
 export default function UpstreamPage() {
+  const { content } = useSiteContent();
   const highlights = [
     { label: "Produksi Migas Rata-rata", value: "1,04 Juta BOEPD" },
     { label: "Kontribusi Minyak Domestik", value: "68% Pasokan Nasional" },
@@ -18,7 +20,7 @@ export default function UpstreamPage() {
       {/* 1. HERO SECTION */}
       <section className="relative w-full min-h-[480px] sm:min-h-[520px] flex items-center overflow-hidden bg-[#0B132B] pt-32 sm:pt-40 pb-16 sm:pb-20">
         <Image
-          src="/images/offshore_rig_pertamina.jpg"
+          src={content.subholding_phe_img || "/images/offshore_rig_pertamina.jpg"}
           alt="Eksplorasi Hulu Migas Pertamina (PHE)"
           fill
           className="object-cover opacity-20"
@@ -38,13 +40,9 @@ export default function UpstreamPage() {
               Subholding Upstream
             </span>
 
-            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">
-              Eksplorasi &amp; Produksi Migas Nasional
-            </h1>
+            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">{content.subholding_phe_title}</h1>
 
-            <p className="text-white/80 text-sm sm:text-base leading-relaxed">
-              Dikelola oleh PT Pertamina Hulu Energi (PHE), pilar utama penyedia pasokan energi primer dari lapangan migas lepas pantai dan daratan nusantara hingga ekspansi aset internasional.
-            </p>
+            <p className="text-white/80 text-sm sm:text-base leading-relaxed">{content.subholding_phe_desc}</p>
           </motion.div>
         </div>
       </section>

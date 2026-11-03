@@ -41,3 +41,7 @@ build
 *.tsbuildinfo
 Dockerfile
 .dockerignore
+
+**/*.dump
+**/*.sql.gz
+**/.local-ops/**

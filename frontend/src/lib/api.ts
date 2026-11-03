@@ -1,4 +1,24 @@
-import axios from "axios";
+import axios, { type AxiosRequestConfig, type AxiosResponse } from "axios";
+
+export const ADMIN_API_BASE_URL = "/api/gateway";
+export const adminApi = axios.create({ headers: { "X-CSRF-Protection": "1" } });
+
+// Share only requests currently in flight. Completed responses are never persisted.
+const pendingRequests = new Map<string, Promise<AxiosResponse>>();
+function publicGet(url: string, config: AxiosRequestConfig = {}): Promise<AxiosResponse> {
+  // An abortable caller owns its transport; do not cancel another consumer.
+  if (config.signal) return axios.get(url, config);
+  const key = JSON.stringify([url, config.params]);
+  let pending = pendingRequests.get(key);
+  if (!pending) {
+    pending = axios.get(url, config).finally(() => pendingRequests.delete(key));
+    pendingRequests.set(key, pending);
+  }
+  return pending.then(response => {
+    if (config.signal?.aborted) throw new axios.CanceledError();
+    return response;
+  });
+}
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
@@ -14,7 +34,6 @@ export interface EventItem {
   location: string;
   image_url: string;
   is_published: boolean;
-  views: number;
   published_at?: string;
   created_at: string;
   updated_at: string;
@@ -30,14 +49,14 @@ export interface PaginationMeta {
 export async function fetchEvents(params?: {
   category?: string; q?: string; page?: number; limit?: number;
 }): Promise<{ data: EventItem[]; meta: PaginationMeta }> {
-  const res = await axios.get(`${API_BASE_URL}/events`, { params, timeout: 65000 });
+  const res = await publicGet(`${API_BASE_URL}/events`, { params, timeout: 65000 });
   if (!res.data?.success || !Array.isArray(res.data.data)) throw new Error("Gagal memuat berita");
   return { data: res.data.data, meta: res.data.meta };
 }
 
 export async function fetchEventBySlug(slug: string, signal?: AbortSignal): Promise<{ data: EventItem; related: EventItem[] } | null> {
   try {
-    const res = await axios.get(`${API_BASE_URL}/events/${encodeURIComponent(slug)}`, { timeout: 65000, signal });
+    const res = await publicGet(`${API_BASE_URL}/events/${encodeURIComponent(slug)}`, { timeout: 65000, signal });
     if (!res.data?.success || !res.data.data) throw new Error("Gagal memuat artikel");
     return { data: res.data.data, related: res.data.related || [] };
   } catch (error) {
@@ -76,17 +95,17 @@ export interface JobItem {
   subholding?: string;
 }
 
-export async function fetchJobs(params?: { department?: string; type?: string; q?: string }, signal?: AbortSignal): Promise<{ data: JobItem[] }> {
-  const res = await axios.get(`${API_BASE_URL}/jobs`, {
-    params: { department: params?.department, type: params?.type, search: params?.q }, timeout: 65000, signal,
+export async function fetchJobs(params?: { department?: string; type?: string; q?: string; page?: number; limit?: number }, signal?: AbortSignal): Promise<{ data: JobItem[]; meta: PaginationMeta }> {
+  const res = await publicGet(`${API_BASE_URL}/jobs`, {
+    params: { department: params?.department, type: params?.type, search: params?.q, page: params?.page, limit: params?.limit }, timeout: 65000, signal,
   });
   if (!res.data?.success || !Array.isArray(res.data.data)) throw new Error("Gagal memuat lowongan");
-  return { data: res.data.data };
+  return { data: res.data.data, meta: res.data.meta };
 }
 
 export async function fetchJobBySlug(slug: string): Promise<JobItem | null> {
   try {
-    const res = await axios.get(`${API_BASE_URL}/jobs/${encodeURIComponent(slug)}`, { timeout: 65000 });
+    const res = await publicGet(`${API_BASE_URL}/jobs/${encodeURIComponent(slug)}`, { timeout: 65000 });
     if (!res.data?.success || !res.data.data) throw new Error("Gagal memuat lowongan");
     return res.data.data;
   } catch (error) {
@@ -583,7 +602,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentMap = {
   about_hero_img: "/images/grha_pertamina_jakarta.jpg",
   about_vision: "Menjadi perusahaan energi nasional kelas dunia yang terdepan dalam inovasi rendah karbon dan kedaulatan sumber daya alam Indonesia.",
   about_mission: "1. Menjalankan usaha migas dan petrokimia secara terintegrasi berstandar global.\n2. Mengakselerasi transisi energi baru terbarukan dan program dekarbonisasi Net Zero Emission 2060.\n3. Memberikan kontribusi nyata bagi penerimaan negara, kesejahteraan masyarakat, dan kelestarian lingkungan.",
-  
+
   // Direksi (Board of Directors)
   director_1_name: "Simon Aloysius Mantiri",
   director_1_role: "Direktur Utama",
@@ -606,7 +625,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentMap = {
   business_hero_title: "Ekosistem Energi Terintegrasi dari Hulu Hingga Hilir",
   business_hero_desc: "Mengelola seluruh rantai pasok energi: eksplorasi minyak bumi, gas alam, kilang canggih, stasiun pengisian terluas, hingga energi terbarukan.",
   business_hero_img: "/images/pertamina_hero_refinery.jpg",
-  
+
   // 6 Subholding
   subholding_phe_title: "Pertamina Hulu Energi (PHE)",
   subholding_phe_desc: "Memimpin lifting migas nasional di darat dan lepas pantai melalui pengelolaan blok-blok strategis seperti Rokan dan Mahakam.",
@@ -631,7 +650,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentMap = {
   sustainability_hero_title: "Komitmen Nyata Menuju Net Zero Emission 2060",
   sustainability_hero_desc: "Membangun keseimbangan antara ketahanan energi nasional dan tanggung jawab terhadap kelestarian bumi demi generasi masa depan.",
   sustainability_hero_img: "/images/sustainability_ccus_plant.jpg",
-  
+
   nze_title: "Peta Jalan Dekarbonisasi & Energi Rendah Karbon",
   nze_desc: "Alokasi capex hingga 35% untuk inisiatif hijau, termasuk teknologi Carbon Capture Utilization and Storage (CCUS) dan bio-refinery.",
   nze_img: "/images/sustainability_ccus_plant.jpg",
@@ -660,7 +679,7 @@ export const DEFAULT_SITE_CONTENT: SiteContentMap = {
 
 export async function fetchSiteContent(section?: string): Promise<{ data: SiteContentItem[]; map: SiteContentMap }> {
   const path = section ? `/content/${encodeURIComponent(section)}` : "/content";
-  const res = await axios.get(`${API_BASE_URL}${path}`, { timeout: 65000 });
+  const res = await publicGet(`${API_BASE_URL}${path}`, { timeout: 65000 });
   if (!res.data?.success || !Array.isArray(res.data.data)) throw new Error("Gagal memuat konten situs");
   const data: SiteContentItem[] = res.data.data;
   return { data, map: Object.fromEntries(data.map(item => [item.key, item.value])) };
@@ -680,38 +699,37 @@ export function changedContent(values: SiteContentMap, baseline: SiteContentMap)
 // ADMIN PORTAL API HELPERS
 // ==========================================
 
-export async function adminFetchJobs(token: string) {
-  return axios.get(`${API_BASE_URL}/admin/jobs`, {
-    headers: { Authorization: `Bearer ${token}` },
+export async function adminFetchJobs() {
+  return adminApi.get(`${ADMIN_API_BASE_URL}/admin/jobs`, {
+
   });
 }
 
-export async function adminCreateJob(token: string, data: Partial<JobItem>) {
-  return axios.post(`${API_BASE_URL}/admin/jobs`, data, {
-    headers: { Authorization: `Bearer ${token}` },
+export async function adminCreateJob(data: Partial<JobItem>) {
+  return adminApi.post(`${ADMIN_API_BASE_URL}/admin/jobs`, data, {
+
   });
 }
 
-export async function adminUpdateJob(token: string, id: number, data: Partial<JobItem>) {
-  return axios.put(`${API_BASE_URL}/admin/jobs/${id}`, data, {
-    headers: { Authorization: `Bearer ${token}` },
+export async function adminUpdateJob(id: number, data: Partial<JobItem>) {
+  return adminApi.put(`${ADMIN_API_BASE_URL}/admin/jobs/${id}`, data, {
+
   });
 }
 
-export async function adminDeleteJob(token: string, id: number) {
-  return axios.delete(`${API_BASE_URL}/admin/jobs/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
+export async function adminDeleteJob(id: number) {
+  return adminApi.delete(`${ADMIN_API_BASE_URL}/admin/jobs/${id}`, {
+
   });
 }
 
-export async function adminFetchContent(token: string) {
-  return axios.get(`${API_BASE_URL}/admin/content`, {
-    headers: { Authorization: `Bearer ${token}` },
+export async function adminFetchContent() {
+  return adminApi.get(`${ADMIN_API_BASE_URL}/admin/content`, {
+
   });
 }
 
 export async function adminCreateContent(
-  token: string,
   data: {
     key: string;
     section?: string;
@@ -720,48 +738,46 @@ export async function adminCreateContent(
     value: string;
   }
 ) {
-  return axios.post(`${API_BASE_URL}/admin/content`, data, {
-    headers: { Authorization: `Bearer ${token}` },
+  return adminApi.post(`${ADMIN_API_BASE_URL}/admin/content`, data, {
+
   });
 }
 
 export async function adminUpdateSingleContent(
-  token: string,
   key: string,
   data: { value: string; label?: string }
 ) {
-  return axios.put(`${API_BASE_URL}/admin/content/${encodeURIComponent(key)}`, data, {
-    headers: { Authorization: `Bearer ${token}` },
+  return adminApi.put(`${ADMIN_API_BASE_URL}/admin/content/${encodeURIComponent(key)}`, data, {
+
   });
 }
 
-export async function adminDeleteContent(token: string, key: string) {
-  return axios.delete(`${API_BASE_URL}/admin/content/${encodeURIComponent(key)}`, {
-    headers: { Authorization: `Bearer ${token}` },
+export async function adminDeleteContent(key: string) {
+  return adminApi.delete(`${ADMIN_API_BASE_URL}/admin/content/${encodeURIComponent(key)}`, {
+
   });
 }
 
 export async function adminBatchUpdateContent(
-  token: string,
   items: { key: string; value: string }[] | Record<string, string>
 ) {
   const payload = Array.isArray(items)
     ? items
     : Object.entries(items).map(([key, value]) => ({ key, value }));
 
-  return axios.put(
-    `${API_BASE_URL}/admin/content`,
+  return adminApi.put(
+    `${ADMIN_API_BASE_URL}/admin/content`,
     { items: payload },
-    { headers: { Authorization: `Bearer ${token}` } }
+    {}
   );
 }
 
-export async function adminUploadImage(token: string, file: File) {
+export async function adminUploadImage(file: File) {
   const formData = new FormData();
   formData.append("image", file);
-  return axios.post<{ success: boolean; url: string; filename: string }>(`${API_BASE_URL}/admin/upload`, formData, {
+  return adminApi.post<{ success: boolean; url: string; filename: string }>(`${ADMIN_API_BASE_URL}/admin/upload`, formData, {
     headers: {
-      Authorization: `Bearer ${token}`,
+
       "Content-Type": "multipart/form-data",
     },
   });

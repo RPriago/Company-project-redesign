@@ -1,29 +1,31 @@
 "use client";
 
+import { useSiteContent } from "@/lib/useSiteContent";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 
 export default function BoardOfDirectorsPage() {
+  const { content } = useSiteContent();
   const boardOfDirectors = [
     {
-      name: "Simon Aloysius Mantiri",
-      role: "Direktur Utama",
-      bio: "Memimpin arah strategis transformasi operasional, penguatan ketahanan pasokan energi nasional, serta percepatan transisi energi hijau terpadu PT Pertamina (Persero).",
-      image: "/images/director_ceo_portrait.jpg",
+      name: content.director_1_name || "Simon Aloysius Mantiri",
+      role: content.director_1_role || "Direktur Utama",
+      bio: content.director_1_bio || "Memimpin arah strategis transformasi operasional, penguatan ketahanan pasokan energi nasional, serta percepatan transisi energi hijau terpadu PT Pertamina (Persero).",
+      image: content.director_1_img || "/images/director_ceo_portrait.jpg",
     },
     {
-      name: "Wiko Migantoro",
-      role: "Wakil Direktur Utama",
-      bio: "Bertanggung jawab atas efisiensi rantai operasi hulu-ke-hilir serta integrasi keselamatan kerja berstandar HSSE internasional di seluruh entitas bisnis.",
-      image: "/images/director_vceo_portrait.jpg",
+      name: content.director_2_name || "Wiko Migantoro",
+      role: content.director_2_role || "Wakil Direktur Utama",
+      bio: content.director_2_bio || "Bertanggung jawab atas efisiensi rantai operasi hulu-ke-hilir serta integrasi keselamatan kerja berstandar HSSE internasional di seluruh entitas bisnis.",
+      image: content.director_2_img || "/images/director_vceo_portrait.jpg",
     },
     {
-      name: "Emma Sri Martini",
-      role: "Direktur Keuangan",
-      bio: "Bertanggung jawab atas strategi pendanaan korporat terpadu, pengelolaan permodalan, serta penerbitan instrumen keuangan hijau (Green Bonds) berstandar internasional.",
-      image: "/images/director_cfo_portrait.jpg",
+      name: content.director_3_name || "Emma Sri Martini",
+      role: content.director_3_role || "Direktur Keuangan",
+      bio: content.director_3_bio || "Bertanggung jawab atas strategi pendanaan korporat terpadu, pengelolaan permodalan, serta penerbitan instrumen keuangan hijau (Green Bonds) berstandar internasional.",
+      image: content.director_3_img || "/images/director_cfo_portrait.jpg",
     },
     {
       name: "Erry Widiastono",

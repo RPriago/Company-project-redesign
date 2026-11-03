@@ -1,8 +1,10 @@
+import { headers } from "next/headers";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { SiteContentProvider } from "@/lib/useSiteContent";
 import ScrollToTop from "@/components/ScrollToTop";
 
 const plusJakarta = localFont({
@@ -47,17 +49,20 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Per-request CSP nonces must be rendered into every framework script.
+  await headers();
   return (
     <html
       lang="id"
       className={`scroll-smooth ${plusJakarta.variable} ${inter.variable}`}
     >
       <body className="font-body antialiased min-h-screen flex flex-col bg-white text-[#5B616E]">
+        <SiteContentProvider>
         <Navbar />
         <main className="flex-1">{children}</main>
         <aside aria-label="Portfolio demonstration" className="border-t border-amber-200 bg-amber-50 px-4 py-3 text-center text-xs text-amber-950">
@@ -65,6 +70,7 @@ export default function RootLayout({
         </aside>
         <Footer />
         <ScrollToTop />
+        </SiteContentProvider>
       </body>
     </html>
   );

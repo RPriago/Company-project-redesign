@@ -1,5 +1,7 @@
 "use client";
 
+import { useSiteContent } from "@/lib/useSiteContent";
+
 import Image from "next/image";
 
 import { motion } from "framer-motion";
@@ -7,6 +9,7 @@ import { ShieldCheck } from "lucide-react";
 import AkhlakShowcase from "@/components/home/AkhlakShowcase";
 
 export default function AboutPage() {
+  const { content } = useSiteContent();
   const milestones = [
     {
       year: "1957",
@@ -37,22 +40,22 @@ export default function AboutPage() {
 
   const boardOfDirectors = [
     {
-      name: "Simon Aloysius Mantiri",
-      role: "Direktur Utama",
-      bio: "Memimpin arah strategis transformasi korporasi, penguatan pasokan energi nasional, serta percepatan transisi energi hijau terpadu.",
-      image: "/images/director_ceo_portrait.jpg",
+      name: content.director_1_name || "Simon Aloysius Mantiri",
+      role: content.director_1_role || "Direktur Utama",
+      bio: content.director_1_bio || "Memimpin arah strategis transformasi korporasi, penguatan pasokan energi nasional, serta percepatan transisi energi hijau terpadu.",
+      image: content.director_1_img || "/images/director_ceo_portrait.jpg",
     },
     {
-      name: "Wiko Migantoro",
-      role: "Wakil Direktur Utama",
-      bio: "Bertanggung jawab atas efisiensi rantai operasi hulu-ke-hilir serta integrasi keselamatan kerja berstandar HSSE internasional.",
-      image: "/images/director_vceo_portrait.jpg",
+      name: content.director_2_name || "Wiko Migantoro",
+      role: content.director_2_role || "Wakil Direktur Utama",
+      bio: content.director_2_bio || "Bertanggung jawab atas efisiensi rantai operasi hulu-ke-hilir serta integrasi keselamatan kerja berstandar HSSE internasional.",
+      image: content.director_2_img || "/images/director_vceo_portrait.jpg",
     },
     {
-      name: "Emma Sri Martini",
-      role: "Direktur Keuangan",
-      bio: "Mengelola strategi pendanaan korporat terpadu, struktur permodalan, serta penerbitan instrumen keuangan berkelanjutan.",
-      image: "/images/director_cfo_portrait.jpg",
+      name: content.director_3_name || "Emma Sri Martini",
+      role: content.director_3_role || "Direktur Keuangan",
+      bio: content.director_3_bio || "Mengelola strategi pendanaan korporat terpadu, struktur permodalan, serta penerbitan instrumen keuangan berkelanjutan.",
+      image: content.director_3_img || "/images/director_cfo_portrait.jpg",
     },
     {
       name: "A. Salyadi Saputra",
@@ -67,7 +70,7 @@ export default function AboutPage() {
       {/* 1. HERO SECTION */}
       <section className="relative w-full min-h-[480px] sm:min-h-[520px] flex items-center overflow-hidden bg-[#0B132B] pt-32 sm:pt-40 pb-16 sm:pb-20">
         <Image
-          src="/images/grha_pertamina_jakarta.jpg"
+          src={content.about_hero_img || "/images/grha_pertamina_jakarta.jpg"}
           alt="Grha Pertamina Corporate Headquarters"
           fill
           className="object-cover opacity-20"
@@ -86,12 +89,8 @@ export default function AboutPage() {
             <span className="text-xs font-medium tracking-[0.14em] uppercase text-white/70 block">
               Profil Perusahaan
             </span>
-            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">
-              Mengabdi untuk Kemandirian Energi Bangsa
-            </h1>
-            <p className="text-white/80 text-sm sm:text-base leading-relaxed">
-              PT Pertamina (Persero) mengemban mandat kedaulatan energi Indonesia melalui rantai pasok terintegrasi dari hulu migas, kilang modern Euro 5, jaringan distribusi nusantara, hingga energi baru terbarukan.
-            </p>
+            <h1 className="font-hero-display text-3xl sm:text-5xl lg:text-6xl font-semibold text-white tracking-tight leading-tight">{content.about_hero_title}</h1>
+            <p className="text-white/80 text-sm sm:text-base leading-relaxed">{content.about_hero_desc}</p>
           </motion.div>
         </div>
       </section>
@@ -116,7 +115,7 @@ export default function AboutPage() {
                 </div>
 
                 <h2 className="font-heading text-2xl sm:text-3xl lg:text-[32px] font-semibold text-slate-900 leading-[1.3] tracking-tight">
-                  &ldquo;Menjadi Perusahaan Energi Nasional Kelas Dunia yang Ramah Lingkungan, Kompetitif, dan Berdaulat.&rdquo;
+                  {content.about_vision}
                 </h2>
 
                 <p className="text-slate-600 text-xs sm:text-sm leading-relaxed pt-4 border-t border-slate-100">
@@ -132,34 +131,7 @@ export default function AboutPage() {
                   </span>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3.5">
-                    <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded shrink-0 mt-0.5">
-                      01
-                    </span>
-                    <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-                      Menjalankan usaha minyak, gas, serta energi baru dan terbarukan secara terintegrasi berlandaskan prinsip komersial yang kuat.
-                    </p>
-                  </div>
-
-                  <div className="flex items-start gap-3.5">
-                    <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded shrink-0 mt-0.5">
-                      02
-                    </span>
-                    <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-                      Memastikan ketersediaan energi primer dan produk turunan berkualitas bagi seluruh lapisan masyarakat Indonesia.
-                    </p>
-                  </div>
-
-                  <div className="flex items-start gap-3.5">
-                    <span className="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded shrink-0 mt-0.5">
-                      03
-                    </span>
-                    <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-                      Memimpin percepatan transisi energi bersih dan penurunan emisi gas rumah kaca menuju Net Zero Emission 2060.
-                    </p>
-                  </div>
-                </div>
+                <div className="space-y-4">{content.about_mission.split("\n").filter(Boolean).map((mission, index) => <p key={index} className="text-xs sm:text-sm text-slate-700 leading-relaxed">{mission}</p>)}</div>
 
                 <div className="text-xs text-slate-400 pt-4 border-t border-slate-100">
                   Berlandaskan kepatuhan tata kelola GCG dan tata nilai AKHLAK BUMN.
