@@ -10,8 +10,25 @@ import (
 	"image/png"
 	"mime/multipart"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
+
+func TestSafeUploadErrorRedactsCredentials(t *testing.T) {
+	t.Setenv("CLOUDINARY_URL", "cloudinary://private-key:private%2Bsecret@demo-cloud")
+	message := safeUploadError(errors.New("Invalid api_key private-key\nprivate+secret private%2Bsecret cloudinary://private-key:private%2Bsecret@demo-cloud"))
+	for _, sensitive := range []string{"private-key", "private+secret", "private%2Bsecret", "cloudinary://", "\n"} {
+		if strings.Contains(message, sensitive) {
+			t.Fatalf("diagnostic contains sensitive or multiline data: %q", message)
+		}
+	}
+	if !strings.Contains(message, "Invalid api_key") {
+		t.Fatal("provider diagnosis was lost")
+	}
+	if got := safeUploadError(errors.New(strings.Repeat("x", 2000))); len(got) > 1003 {
+		t.Fatal("diagnostic was not bounded")
+	}
+}
 
 func TestUploadValidationAndProviderOutcomes(t *testing.T) {
 	var valid bytes.Buffer

@@ -9,6 +9,7 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ const maxImageBytes = 5 * 1024 * 1024
 var uploadToProvider = uploadCloudinary
 
 func uploadCloudinary(ctx context.Context, data []byte, publicID string) (string, error) {
-	client, err := cloudinary.NewFromURL(os.Getenv("CLOUDINARY_URL"))
+	client, err := cloudinary.NewFromURL(strings.TrimSpace(os.Getenv("CLOUDINARY_URL")))
 	if err != nil {
 		return "", err
 	}
@@ -41,6 +42,33 @@ func uploadCloudinary(ctx context.Context, data []byte, publicID string) (string
 		return "", fmt.Errorf("provider returned no image")
 	}
 	return result.SecureURL, nil
+}
+
+// SDK errors can contain configuration URLs or credentials. Only log a redacted,
+// bounded single line; never send provider diagnostics back to the browser.
+func safeUploadError(err error) string {
+	message := err.Error()
+	configuration := strings.TrimSpace(os.Getenv("CLOUDINARY_URL"))
+	if configuration != "" {
+		message = strings.ReplaceAll(message, configuration, "[redacted]")
+		if parsed, parseErr := url.Parse(configuration); parseErr == nil && parsed.User != nil {
+			credentials := []string{parsed.User.Username()}
+			if password, ok := parsed.User.Password(); ok {
+				credentials = append(credentials, password)
+			}
+			for _, credential := range credentials {
+				if credential != "" {
+					message = strings.ReplaceAll(message, credential, "[redacted]")
+					message = strings.ReplaceAll(message, url.QueryEscape(credential), "[redacted]")
+				}
+			}
+		}
+	}
+	message = strings.Join(strings.Fields(message), " ")
+	if len(message) > 1000 {
+		message = message[:1000] + "..."
+	}
+	return message
 }
 
 // POST /api/admin/upload. Image bytes go directly to Cloudinary, never local disk.
@@ -84,8 +112,13 @@ func UploadImage(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.UserContext(), 30*time.Second)
 	defer cancel()
 	secureURL, err := uploadToProvider(ctx, data, filename)
+	if err != nil {
+		log.Printf("image upload failed provider=cloudinary detail=%q", safeUploadError(err))
+		return fail(502, "Penyimpanan gambar tidak tersedia. Silakan coba lagi.")
+	}
 	parsed, parseErr := url.Parse(secureURL)
-	if err != nil || parseErr != nil || parsed.Scheme != "https" || parsed.Host == "" {
+	if parseErr != nil || parsed.Scheme != "https" || parsed.Host == "" {
+		log.Print("image upload failed provider=cloudinary detail=invalid_secure_url")
 		return fail(502, "Penyimpanan gambar tidak tersedia. Silakan coba lagi.")
 	}
 	return c.JSON(fiber.Map{"success": true, "message": "Gambar berhasil diunggah", "url": secureURL, "filename": filename + ext})
