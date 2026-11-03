@@ -47,4 +47,4 @@ The command prompts for a password without echoing it and refuses execution when
 
 ## Deployment
 
-See [DEPLOYMENT_PLAN.md](DEPLOYMENT_PLAN.md) for the Vercel Hobby + Render Free + Neon Free + Cloudinary Free runbook, variables, exclusions, zero-row checks, and operating limits. Documentation, tests, local migration/bootstrap utilities, databases, and secrets stay out of deployment inputs. Free plans remain subject to quotas and provider changes.
+Deployment targets are Vercel Hobby, Render Free, Neon Free, and Cloudinary Free. Set production environment variables through provider dashboards using `.env.example` as a reference. Private deployment notes remain local. Documentation, tests, local migration/bootstrap utilities, databases, and secrets stay out of deployment inputs. Free plans remain subject to quotas and provider changes.

@@ -20,3 +20,8 @@ frontend/.env*.local
 **/.vercel/
 **/*.tsbuildinfo
 DEPLOYMENT_URLS.local.md
+
+# Private project documentation: retain locally, never publish.
+*.[mM][dD]
+![rR][eE][aA][dD][mM][eE].[mM][dD]
+/docs/
