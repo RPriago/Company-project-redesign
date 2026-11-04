@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/postgres"
@@ -23,7 +24,8 @@ func OpenDatabase() (*gorm.DB, error) {
 	if production && databaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required in production")
 	}
-	cfg := &gorm.Config{Logger: logger.New(log.New(os.Stdout, "", log.LstdFlags), logger.Config{LogLevel: logger.Warn, SlowThreshold: 200 * time.Millisecond, ParameterizedQueries: true})}
+	// GORM's automatic Ping has no context. Perform the bounded check below.
+	cfg := &gorm.Config{DisableAutomaticPing: true, Logger: logger.New(log.New(os.Stdout, "", log.LstdFlags), logger.Config{LogLevel: logger.Warn, SlowThreshold: 200 * time.Millisecond, ParameterizedQueries: true})}
 	var db *gorm.DB
 	var err error
 	if databaseURL != "" {
@@ -61,11 +63,31 @@ func OpenDatabase() (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("database connection failed; no fallback database was created")
 	}
-	if sqlDB, poolErr := db.DB(); poolErr == nil && db.Dialector.Name() == "postgres" {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("database connection pool unavailable")
+	}
+	ready := false
+	defer func() {
+		if !ready {
+			_ = sqlDB.Close()
+		}
+	}()
+	if db.Dialector.Name() == "postgres" {
 		sqlDB.SetMaxOpenConns(5)
 		sqlDB.SetMaxIdleConns(2)
 		sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 		sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	}
+	startupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	started := time.Now()
+	err = sqlDB.PingContext(startupCtx)
+	cancel()
+	if err != nil {
+		return nil, fmt.Errorf("database startup connectivity check failed; no fallback database was created")
+	}
+	if production {
+		log.Printf(`{"event":"database_connect","duration_ms":%.3f}`, float64(time.Since(started).Microseconds())/1000)
 	}
 	if err := installOperationDeadlines(db); err != nil {
 		return nil, err
@@ -73,6 +95,21 @@ func OpenDatabase() (*gorm.DB, error) {
 	if err := InitializeSchema(db); err != nil {
 		return nil, err
 	}
+	if production && db.Dialector.Name() == "postgres" {
+		for sample := 1; sample <= 3; sample++ {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			started := time.Now()
+			var one int
+			err := sqlDB.QueryRowContext(ctx, "SELECT 1").Scan(&one)
+			cancel()
+			if err != nil || one != 1 {
+				return nil, fmt.Errorf("database startup read check failed")
+			}
+			stats := sqlDB.Stats()
+			log.Printf(`{"event":"database_read_probe","sample":%d,"duration_ms":%.3f,"pool_wait_count":%d,"pool_wait_ms":%.3f,"open_connections":%d,"idle_connections":%d}`, sample, float64(time.Since(started).Microseconds())/1000, stats.WaitCount, float64(stats.WaitDuration.Microseconds())/1000, stats.OpenConnections, stats.Idle)
+		}
+	}
+	ready = true
 	return db, nil
 }
 
