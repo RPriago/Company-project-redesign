@@ -117,24 +117,28 @@ func TestVisibilityPaginationSortAndDatabaseFailures(t *testing.T) {
 	db.Create(&models.JobVacancy{Title: "inactive", Slug: "inactive", Department: "test", IsActive: false})
 	for i := 0; i < 12; i++ {
 		db.Create(&models.JobVacancy{Title: fmt.Sprint(i), Slug: fmt.Sprint(i), Department: "test", IsActive: true})
+		db.Create(&models.Event{Title: fmt.Sprint(i), Slug: fmt.Sprint(i), IsPublished: true})
 	}
 	app := fiber.New()
 	app.Get("/api/events", GetEvents)
 	app.Get("/api/events/:slug", GetEventBySlug)
 	app.Get("/api/jobs", GetJobs)
 	app.Get("/api/jobs/:slug", GetJobBySlug)
-	res := request(t, app, "GET", "/api/jobs", "")
+	var res *http.Response
 	var payload struct {
-		Data []models.JobVacancy
+		Data []json.RawMessage
 		Meta struct {
 			Total int
 			Limit int
 		}
 	}
-	json.NewDecoder(res.Body).Decode(&payload)
-	res.Body.Close()
-	if len(payload.Data) != 10 || payload.Meta.Total != 12 || payload.Meta.Limit != 10 {
-		t.Fatalf("pagination %+v", payload)
+	for _, path := range []string{"/api/jobs", "/api/events"} {
+		res = request(t, app, "GET", path, "")
+		json.NewDecoder(res.Body).Decode(&payload)
+		res.Body.Close()
+		if len(payload.Data) != 10 || payload.Meta.Total != 12 || payload.Meta.Limit != 10 {
+			t.Fatalf("%s pagination %+v", path, payload)
+		}
 	}
 	for _, path := range []string{"/api/events/draft", "/api/jobs/inactive"} {
 		res := request(t, app, "GET", path, "")

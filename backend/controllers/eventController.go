@@ -63,9 +63,9 @@ func uncachedGetEvents(c *fiber.Ctx) error {
 	if page < 1 {
 		page = 1
 	}
-	limit, _ := strconv.Atoi(c.Query("limit", "9"))
+	limit, _ := strconv.Atoi(c.Query("limit", "10"))
 	if limit < 1 || limit > 50 {
-		limit = 9
+		limit = 10
 	}
 	if page > 1000000 {
 		return c.SendStatus(400)
