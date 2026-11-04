@@ -40,6 +40,18 @@ func invalidatePublicCache() {
 	publicCache.bytes = 0
 	publicCache.Unlock()
 }
+
+// GET revalidation uses weak comparison; proxies may weaken an origin ETag.
+func matchesETag(header, tag string) bool {
+	for _, candidate := range strings.Split(header, ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "*" || strings.TrimPrefix(candidate, "W/") == tag {
+			return true
+		}
+	}
+	return false
+}
+
 func cachedPublic(c *fiber.Ctx, handler fiber.Handler) error {
 	query, err := url.ParseQuery(string(c.Request().URI().QueryString()))
 	if err != nil {
@@ -71,7 +83,7 @@ func cachedPublic(c *fiber.Ctx, handler fiber.Handler) error {
 		c.Set("ETag", tag)
 		c.Set("X-Cache", status)
 		c.Type("json")
-		if c.Get("If-None-Match") == tag {
+		if matchesETag(c.Get("If-None-Match"), tag) {
 			return c.SendStatus(304)
 		}
 		return c.Send(body)

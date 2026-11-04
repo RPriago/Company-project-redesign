@@ -54,15 +54,19 @@ func TestPublicCacheNormalizedQueryETagAndFailure(t *testing.T) {
 	})
 	first := request(t, app, "GET", "/api/test?page=01&limit=10", "")
 	first.Body.Close()
-	r := httptest.NewRequest("GET", "/api/test?limit=10&page=1", nil)
-	r.Header.Set("If-None-Match", first.Header.Get("ETag"))
-	second, err := app.Test(r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second.Body.Close()
-	if second.StatusCode != 304 || calls.Load() != 1 || second.Header.Get("Cache-Control") != "public, no-cache" {
-		t.Fatalf("status %d calls %d", second.StatusCode, calls.Load())
+	tag := first.Header.Get("ETag")
+	for _, header := range []string{tag, "W/" + tag, `"stale", W/` + tag, "*"} {
+		r := httptest.NewRequest("GET", "/api/test?limit=10&page=1", nil)
+		r.Header.Set("If-None-Match", header)
+		second, err := app.Test(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(second.Body)
+		second.Body.Close()
+		if second.StatusCode != 304 || len(body) != 0 || calls.Load() != 1 || second.Header.Get("Cache-Control") != "public, no-cache" {
+			t.Fatalf("header %s status %d calls %d body %s", header, second.StatusCode, calls.Load(), body)
+		}
 	}
 	app.Get("/api/failure", func(c *fiber.Ctx) error {
 		return cachedPublic(c, func(c *fiber.Ctx) error { calls.Add(1); return c.SendStatus(503) })
